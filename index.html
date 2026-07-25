@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>DriveSafe Youth Initiative | Non-Profit Driver Safety Platform</title>
+
+    <!-- Google Fonts: Plus Jakarta Sans & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Custom Glow & Glassmorphism Utilities -->
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body class="bg-[#0f172a] text-slate-100 min-h-screen font-sans antialiased selection:bg-emerald-500 selection:text-slate-900">
+    <div id="root"></div>
+
+    <!-- Vanilla JS Modular Telematics Libraries -->
+    <script src="/js/backend.js"></script>
+    <script src="/js/telematics.js"></script>
+    <script src="/js/app.js"></script>
+
+    <!-- React Main App Entry -->
+    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('DriveSafe Service Worker registered:', reg.scope))
+            .catch(err => console.log('Service Worker registration failed:', err));
+        });
+      }
+    </script>
+  </body>
+</html>

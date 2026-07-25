@@ -1,0 +1,202 @@
+/* 
+ * DriveSafe Youth Initiative - Frosted Glass Design Theme
+ * Theme: Midnight Canvas (#020617) with Frosted Glass (rgba(15, 23, 42, 0.7)),
+ * Neon Mint (#2dd4bf) & Neon Violet (#a78bfa)
+ */
+
+@import "tailwindcss";
+
+:root {
+  --bg: #020617;
+  --slate: #0f172a;
+  --mint: #2dd4bf;
+  --mint-glow: rgba(45, 212, 191, 0.25);
+  --violet: #a78bfa;
+  --violet-glow: rgba(167, 139, 250, 0.25);
+  --glass: rgba(15, 23, 42, 0.7);
+  --border: rgba(255, 255, 255, 0.1);
+  --neon-amber: #f59e0b;
+  --neon-red: #ef4444;
+}
+
+body {
+  background-color: var(--bg);
+  background-image: 
+    radial-gradient(circle at 0% 0%, #1e1b4b 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, #134e4a 0%, transparent 50%);
+  background-attachment: fixed;
+  color: #f8fafc;
+  font-family: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow-x: hidden;
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* Frosted Glass Container */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.glass-card {
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(45, 212, 191, 0.25);
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5), 0 0 20px var(--mint-glow);
+}
+
+/* Card Titles */
+.card-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--violet);
+  margin-bottom: 12px;
+}
+
+/* Stat Value Typography */
+.stat-value {
+  font-size: 2.25rem;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--mint);
+}
+
+/* HUD Circle Container */
+.hud-circle {
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  border: 2px solid rgba(45, 212, 191, 0.25);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, rgba(45, 212, 191, 0.08) 0%, transparent 70%);
+  box-shadow: 0 0 30px rgba(45, 212, 191, 0.1);
+}
+
+.g-force-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--mint);
+  border-radius: 50%;
+  box-shadow: 0 0 15px var(--mint);
+  position: absolute;
+}
+
+/* Glow Utilities */
+.glow-mint {
+  box-shadow: 0 0 20px var(--mint-glow), inset 0 0 10px var(--mint-glow);
+}
+
+.glow-violet {
+  box-shadow: 0 0 20px var(--violet-glow), inset 0 0 10px var(--violet-glow);
+}
+
+.text-mint {
+  color: var(--mint);
+}
+
+.text-violet {
+  color: var(--violet);
+}
+
+.bg-mint {
+  background-color: var(--mint);
+}
+
+.bg-violet {
+  background-color: var(--violet);
+}
+
+/* Language Pill Buttons */
+.lang-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94a3b8;
+  background: rgba(15, 23, 42, 0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lang-btn:hover {
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.lang-btn.active {
+  background: var(--violet);
+  border-color: var(--violet);
+  color: #ffffff;
+  box-shadow: 0 0 12px var(--violet-glow);
+}
+
+/* HUD Canvas Pulse & Radar Animations */
+@keyframes radar-sweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.radar-spinner {
+  animation: radar-sweep 4s linear infinite;
+  transform-origin: center;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+}
+
+.hud-ring-pulse {
+  animation: pulse-ring 3s ease-in-out infinite;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #020617;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mint);
+}

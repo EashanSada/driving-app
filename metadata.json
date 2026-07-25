@@ -1,0 +1,6 @@
+{
+  "name": "DriveSafe Youth Initiative",
+  "description": "Non-profit youth driver safety platform featuring real-time telematics, ML risk analysis, multi-language support, and native mobile bridge.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
