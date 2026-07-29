@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Play, Square, Gauge, Zap, Compass, AlertOctagon, ShieldCheck, Activity, Flame } from 'lucide-react';
 import { TelematicsState, LanguageCode, UnitSystem } from '../types';
 import { t } from '../translations';
+import { recordTripForActiveUser } from '../lib/accountManager';
 
 interface TelematicsHudViewProps {
   currentLanguage: LanguageCode;
@@ -61,6 +62,7 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
     if (telematicsEngineRef.current) {
       const summary = telematicsEngineRef.current.stopTracking();
       setIsTracking(false);
+      recordTripForActiveUser(summary, unitSystem);
       onTripCompleted(summary);
     }
   };

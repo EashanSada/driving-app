@@ -4,9 +4,10 @@ import { TelematicsHudView } from './components/TelematicsHudView';
 import { RiskAnalysisView } from './components/RiskAnalysisView';
 import { LeaderboardView } from './components/LeaderboardView';
 import { GamificationView } from './components/GamificationView';
-import { CommunityView } from './components/CommunityView';
 import { HazardMapView } from './components/HazardMapView';
+import { UserLoginModal } from './components/UserLoginModal';
 import { LanguageCode, NavTab, UnitSystem } from './types';
+import { getAccount, getActiveUsername, UserAccount } from './lib/accountManager';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('hud');
@@ -15,10 +16,25 @@ export default function App() {
   const [hasNativeBridge, setHasNativeBridge] = useState(false);
   const [lastTripSummary, setLastTripSummary] = useState<any>(null);
 
+  // User Account State
+  const [activeUsername, setActiveUsernameState] = useState<string | null>(null);
+  const [activeAccount, setActiveAccount] = useState<UserAccount | null>(null);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
   useEffect(() => {
     // Check if Native Android Bridge is present
     if (typeof (window as any).AndroidBridge !== 'undefined') {
       setHasNativeBridge(true);
+    }
+
+    // Initialize active username
+    const savedUser = getActiveUsername();
+    if (savedUser) {
+      setActiveUsernameState(savedUser);
+      setActiveAccount(getAccount(savedUser));
+    } else {
+      // Auto open login modal if no user logged in
+      setIsLoginModalOpen(true);
     }
 
     // Initialize App Controller
@@ -26,6 +42,12 @@ export default function App() {
       (window as any).DriveSafeApp.setLanguage(currentLanguage);
     }
   }, []);
+
+  const handleLoginSuccess = (username: string) => {
+    setActiveUsernameState(username);
+    setActiveAccount(getAccount(username));
+    setIsLoginModalOpen(false);
+  };
 
   const handleSetLanguage = (lang: LanguageCode) => {
     setCurrentLanguage(lang);
@@ -36,12 +58,24 @@ export default function App() {
 
   const handleTripCompleted = (summary: any) => {
     setLastTripSummary(summary);
+    // Refresh active account state
+    if (activeUsername) {
+      setActiveAccount(getAccount(activeUsername));
+    }
     // Switch to ML Risk Analysis view automatically on trip completion
     setActiveTab('analysis');
   };
 
   return (
     <div className="min-h-screen bg-transparent text-slate-100 flex flex-col font-sans selection:bg-[#2dd4bf] selection:text-slate-950">
+      {/* User Login Modal */}
+      <UserLoginModal
+        isOpen={isLoginModalOpen}
+        onLoginSuccess={handleLoginSuccess}
+        onClose={() => setIsLoginModalOpen(false)}
+        allowCancel={Boolean(activeUsername)}
+      />
+
       {/* Sticky Header */}
       <NavigationHeader
         activeTab={activeTab}
@@ -51,6 +85,9 @@ export default function App() {
         unitSystem={unitSystem}
         setUnitSystem={setUnitSystem}
         hasNativeBridge={hasNativeBridge}
+        activeUsername={activeUsername}
+        activeAccount={activeAccount}
+        onOpenLoginModal={() => setIsLoginModalOpen(true)}
       />
 
       {/* Main Content Viewport */}
@@ -72,11 +109,13 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'leaderboard' && <LeaderboardView />}
+        {activeTab === 'leaderboard' && (
+          <LeaderboardView onOpenLoginModal={() => setIsLoginModalOpen(true)} />
+        )}
 
-        {activeTab === 'gamification' && <GamificationView />}
-
-        {activeTab === 'community' && <CommunityView />}
+        {activeTab === 'gamification' && (
+          <GamificationView onOpenLoginModal={() => setIsLoginModalOpen(true)} />
+        )}
 
         {activeTab === 'hazards' && <HazardMapView unitSystem={unitSystem} />}
       </main>
@@ -86,10 +125,10 @@ export default function App() {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-slate-300 text-[11px]">
             <span className="w-2 h-2 rounded-full bg-[#2dd4bf] animate-pulse" />
-            <span>DriveSafe Youth Network • Live Safety Active</span>
+            <span>DriveSafe Telematics • Active User: <strong className="text-white">{activeUsername || 'Guest'}</strong></span>
           </div>
           <p className="font-medium text-[11px] text-slate-400">
-            © {new Date().getFullYear()} DriveSafe Youth Initiative • Keeping young drivers safe on every road.
+            © {new Date().getFullYear()} DriveSafe Youth Initiative • Real Telematics & Safety Tracking.
           </p>
         </div>
       </footer>

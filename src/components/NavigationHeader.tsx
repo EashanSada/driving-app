@@ -1,7 +1,8 @@
 import React from 'react';
-import { ShieldAlert, Activity, BarChart3, Trophy, AlertTriangle, Smartphone, Award, Users, Gauge } from 'lucide-react';
+import { ShieldAlert, Activity, BarChart3, Trophy, AlertTriangle, Smartphone, Award, User, LogOut } from 'lucide-react';
 import { LanguageCode, NavTab, UnitSystem } from '../types';
 import { t } from '../translations';
+import { UserAccount } from '../lib/accountManager';
 
 interface NavigationHeaderProps {
   activeTab: NavTab;
@@ -11,6 +12,9 @@ interface NavigationHeaderProps {
   unitSystem: UnitSystem;
   setUnitSystem: (unit: UnitSystem) => void;
   hasNativeBridge: boolean;
+  activeUsername: string | null;
+  activeAccount: UserAccount | null;
+  onOpenLoginModal: () => void;
 }
 
 export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
@@ -20,7 +24,10 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
   setLanguage,
   unitSystem,
   setUnitSystem,
-  hasNativeBridge
+  hasNativeBridge,
+  activeUsername,
+  activeAccount,
+  onOpenLoginModal
 }) => {
   const languageNames: Record<LanguageCode, { label: string; flag: string }> = {
     en: { label: 'English', flag: '🇺🇸' },
@@ -34,7 +41,6 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
     { id: 'analysis', key: 'nav_analysis', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'leaderboard', key: 'nav_leaderboard', icon: <Trophy className="w-4 h-4" /> },
     { id: 'gamification', key: 'nav_gamification', icon: <Award className="w-4 h-4" /> },
-    { id: 'community', key: 'nav_community', icon: <Users className="w-4 h-4" /> },
     { id: 'hazards', key: 'nav_hazards', icon: <AlertTriangle className="w-4 h-4" /> }
   ];
 
@@ -134,15 +140,35 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
             })}
           </div>
 
-          {/* User Profile Badge */}
-          <div className="hidden lg:flex items-center gap-2.5 pl-2 border-l border-white/10">
-            <div className="text-right leading-tight">
-              <div className="text-xs font-bold text-slate-100">Alex Rivera</div>
-              <div className="text-[10px] font-semibold text-[#2dd4bf]">{t('safe_driver', currentLanguage)}</div>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-slate-800 border-2 border-[#2dd4bf] overflow-hidden flex items-center justify-center text-xs font-bold text-[#2dd4bf]">
-              AR
-            </div>
+          {/* User Profile Badge / Switch Account */}
+          <div className="flex items-center gap-2 pl-2 border-l border-white/10">
+            {activeUsername && activeAccount ? (
+              <button
+                onClick={onOpenLoginModal}
+                className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-[#020617]/70 border border-white/10 hover:border-[#2dd4bf]/40 transition-all cursor-pointer group"
+                title="Click to Switch Account"
+              >
+                <div className="text-right leading-tight">
+                  <div className="text-xs font-bold text-white group-hover:text-[#2dd4bf] transition-colors">
+                    {activeAccount.username}
+                  </div>
+                  <div className="text-[10px] font-semibold text-[#2dd4bf]">
+                    Score: {activeAccount.safetyScore}
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-[#2dd4bf]/20 border-2 border-[#2dd4bf] flex items-center justify-center text-xs font-bold text-[#2dd4bf] group-hover:bg-[#2dd4bf] group-hover:text-slate-950 transition-all">
+                  {activeAccount.username.substring(0, 2).toUpperCase()}
+                </div>
+              </button>
+            ) : (
+              <button
+                onClick={onOpenLoginModal}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#38bdf8] text-slate-950 font-extrabold text-xs shadow-md hover:shadow-lg transition-all cursor-pointer glow-mint"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Enter Account</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

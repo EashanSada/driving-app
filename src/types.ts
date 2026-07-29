@@ -2,7 +2,7 @@ export type LanguageCode = 'en' | 'es' | 'fr' | 'zh';
 
 export type UnitSystem = 'imperial' | 'metric';
 
-export type NavTab = 'hud' | 'analysis' | 'leaderboard' | 'hazards' | 'gamification' | 'community';
+export type NavTab = 'hud' | 'analysis' | 'leaderboard' | 'hazards' | 'gamification';
 
 export interface TelemetryPoint {
   timestamp: number;
