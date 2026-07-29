@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
 import { Cpu, ShieldCheck, AlertTriangle, Sparkles, RefreshCw, Layers, CheckCircle2, FileJson } from 'lucide-react';
-import { RiskAnalysisResult, LanguageCode } from '../types';
+import { RiskAnalysisResult, LanguageCode, UnitSystem } from '../types';
+import { t } from '../translations';
 
 interface RiskAnalysisViewProps {
   lastTripSummary: any;
   currentLanguage: LanguageCode;
+  unitSystem: UnitSystem;
 }
 
 export const RiskAnalysisView: React.FC<RiskAnalysisViewProps> = ({
   lastTripSummary,
-  currentLanguage
+  currentLanguage,
+  unitSystem
 }) => {
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -48,6 +51,12 @@ export const RiskAnalysisView: React.FC<RiskAnalysisViewProps> = ({
       runAnalysis();
     }
   }, [lastTripSummary]);
+
+  React.useEffect(() => {
+    if (analysisResult?.trip_summary) {
+      fetchAiCoach(analysisResult.trip_summary);
+    }
+  }, [currentLanguage]);
 
   const runAnalysis = async () => {
     setLoading(true);
@@ -244,13 +253,17 @@ export const RiskAnalysisView: React.FC<RiskAnalysisViewProps> = ({
                 <div className="bg-[#020617]/60 p-3 rounded-xl border border-white/10">
                   <span className="text-[11px] text-slate-400 block">Avg Speed</span>
                   <span className="text-base font-bold font-mono text-white">
-                    {analysisResult.trip_summary.avg_velocity_kmh} km/h
+                    {unitSystem === 'imperial'
+                      ? `${(analysisResult.trip_summary.avg_velocity_kmh * 0.621371).toFixed(1)} mph`
+                      : `${analysisResult.trip_summary.avg_velocity_kmh} km/h`}
                   </span>
                 </div>
                 <div className="bg-[#020617]/60 p-3 rounded-xl border border-white/10">
                   <span className="text-[11px] text-slate-400 block">Speed Consistency</span>
                   <span className="text-base font-bold font-mono text-[#2dd4bf]">
-                    ±{analysisResult.trip_summary.velocity_std_dev}
+                    ±{unitSystem === 'imperial'
+                      ? (analysisResult.trip_summary.velocity_std_dev * 0.621371).toFixed(1)
+                      : analysisResult.trip_summary.velocity_std_dev}
                   </span>
                 </div>
                 <div className="bg-[#020617]/60 p-3 rounded-xl border border-white/10">
@@ -284,12 +297,17 @@ export const RiskAnalysisView: React.FC<RiskAnalysisViewProps> = ({
                   Identified Key Risk Factors
                 </span>
                 <ul className="space-y-1.5 text-xs text-slate-300">
-                  {analysisResult.key_risk_factors.map((factor, idx) => (
-                    <li key={idx} className="flex items-center gap-2 bg-[#020617]/40 p-2.5 rounded-lg border border-white/10">
-                      <CheckCircle2 className="w-4 h-4 text-[#2dd4bf] shrink-0" />
-                      <span>{factor}</span>
-                    </li>
-                  ))}
+                  {analysisResult.key_risk_factors.map((factor, idx) => {
+                    const formattedFactor = unitSystem === 'imperial'
+                      ? factor.replace(/0\.0 km\/h/g, '0.0 mph').replace(/km\/h/g, 'mph')
+                      : factor;
+                    return (
+                      <li key={idx} className="flex items-center gap-2 bg-[#020617]/40 p-2.5 rounded-lg border border-white/10">
+                        <CheckCircle2 className="w-4 h-4 text-[#2dd4bf] shrink-0" />
+                        <span>{formattedFactor}</span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             </div>

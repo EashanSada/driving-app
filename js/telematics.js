@@ -38,9 +38,9 @@ class TelematicsEngine {
   }
 
   async requestDeviceMotionPermission() {
-    if (typeof DeviceMotionEvent !== 'undefined' && typeof (DeviceMotionEvent as any).requestPermission === 'function') {
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
       try {
-        const response = await (DeviceMotionEvent as any).requestPermission();
+        const response = await DeviceMotionEvent.requestPermission();
         if (response === 'granted') {
           console.log('DeviceMotion permission granted on iOS');
         }

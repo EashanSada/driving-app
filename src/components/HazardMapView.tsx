@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useAdvancedMarkerRef } from '@vis.gl/react-google-maps';
 import { AlertTriangle, MapPin, ThumbsUp, Plus, ShieldAlert, Navigation, Search, Smartphone, Globe, Sparkles, Route } from 'lucide-react';
-import { HazardReport, RouteSearchResult } from '../types';
+import { HazardReport, RouteSearchResult, UnitSystem } from '../types';
 
 const API_KEY =
   process.env.GOOGLE_MAPS_PLATFORM_KEY ||
@@ -11,7 +11,7 @@ const API_KEY =
 
 const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY';
 
-function HazardMarkerWithInfoWindow({ hazard, onUpvote }: { hazard: HazardReport; onUpvote: (id: string) => void }) {
+const HazardMarkerWithInfoWindow: React.FC<{ hazard: HazardReport; onUpvote: (id: string) => void }> = ({ hazard, onUpvote }) => {
   const [markerRef, marker] = useAdvancedMarkerRef();
   const [open, setOpen] = useState(false);
 
@@ -45,7 +45,7 @@ function HazardMarkerWithInfoWindow({ hazard, onUpvote }: { hazard: HazardReport
   );
 }
 
-export const HazardMapView: React.FC = () => {
+export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSystem = 'imperial' }) => {
   const [hazards, setHazards] = useState<HazardReport[]>([
     {
       id: 'haz_1',
@@ -303,7 +303,11 @@ export const HazardMapView: React.FC = () => {
               <div className="p-3 rounded-lg bg-[#2dd4bf]/10 border border-[#2dd4bf]/30 flex items-center justify-between text-xs">
                 <div>
                   <span className="font-bold text-white block">{routeResult.origin} ➔ {routeResult.destination}</span>
-                  <span className="text-slate-300 text-[11px]">{routeResult.distanceKm} km • Est. {routeResult.durationMinutes} mins drive</span>
+                  <span className="text-slate-300 text-[11px]">
+                    {unitSystem === 'imperial'
+                      ? `${(routeResult.distanceKm * 0.621371).toFixed(1)} miles`
+                      : `${routeResult.distanceKm} km`} • Est. {routeResult.durationMinutes} mins drive
+                  </span>
                 </div>
                 <div className="text-right">
                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#2dd4bf] text-slate-950">

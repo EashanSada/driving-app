@@ -1,12 +1,15 @@
 import React from 'react';
-import { ShieldAlert, Activity, BarChart3, Trophy, AlertTriangle, Globe, Smartphone, Award, Users } from 'lucide-react';
-import { LanguageCode, NavTab } from '../types';
+import { ShieldAlert, Activity, BarChart3, Trophy, AlertTriangle, Smartphone, Award, Users, Gauge } from 'lucide-react';
+import { LanguageCode, NavTab, UnitSystem } from '../types';
+import { t } from '../translations';
 
 interface NavigationHeaderProps {
   activeTab: NavTab;
   setActiveTab: (tab: NavTab) => void;
   currentLanguage: LanguageCode;
   setLanguage: (lang: LanguageCode) => void;
+  unitSystem: UnitSystem;
+  setUnitSystem: (unit: UnitSystem) => void;
   hasNativeBridge: boolean;
 }
 
@@ -15,6 +18,8 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
   setActiveTab,
   currentLanguage,
   setLanguage,
+  unitSystem,
+  setUnitSystem,
   hasNativeBridge
 }) => {
   const languageNames: Record<LanguageCode, { label: string; flag: string }> = {
@@ -24,13 +29,13 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
     zh: { label: '中文 (Mandarin)', flag: '🇨🇳' }
   };
 
-  const navItems: { id: NavTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'hud', label: 'Drive Dashboard', icon: <Activity className="w-4 h-4" /> },
-    { id: 'analysis', label: 'Safety Score', icon: <BarChart3 className="w-4 h-4" /> },
-    { id: 'leaderboard', label: 'Leaderboard', icon: <Trophy className="w-4 h-4" /> },
-    { id: 'gamification', label: 'Badges & Rewards', icon: <Award className="w-4 h-4" /> },
-    { id: 'community', label: 'Youth Groups', icon: <Users className="w-4 h-4" /> },
-    { id: 'hazards', label: 'Road Hazards', icon: <AlertTriangle className="w-4 h-4" /> }
+  const navItems: { id: NavTab; key: Parameters<typeof t>[0]; icon: React.ReactNode }[] = [
+    { id: 'hud', key: 'nav_hud', icon: <Activity className="w-4 h-4" /> },
+    { id: 'analysis', key: 'nav_analysis', icon: <BarChart3 className="w-4 h-4" /> },
+    { id: 'leaderboard', key: 'nav_leaderboard', icon: <Trophy className="w-4 h-4" /> },
+    { id: 'gamification', key: 'nav_gamification', icon: <Award className="w-4 h-4" /> },
+    { id: 'community', key: 'nav_community', icon: <Users className="w-4 h-4" /> },
+    { id: 'hazards', key: 'nav_hazards', icon: <AlertTriangle className="w-4 h-4" /> }
   ];
 
   return (
@@ -49,10 +54,10 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
                 DRIVESAFE <span className="text-[#2dd4bf]">YOUTH</span>
               </h1>
               <span className="px-2 py-0.5 text-[10px] font-semibold tracking-wider text-[#2dd4bf] bg-[#2dd4bf]/10 border border-[#2dd4bf]/20 rounded-full">
-                NON-PROFIT
+                {t('non_profit', currentLanguage)}
               </span>
             </div>
-            <p className="text-xs text-slate-400">Empowering Safe Driving for Youth & Teens</p>
+            <p className="text-xs text-slate-400">{t('subtitle', currentLanguage)}</p>
           </div>
         </div>
 
@@ -71,7 +76,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
                 }`}
               >
                 {item.icon}
-                <span>{item.label}</span>
+                <span>{t(item.key, currentLanguage)}</span>
               </button>
             );
           })}
@@ -85,7 +90,31 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
             title="Real-Time Location & Safety Sensors Active"
           >
             <Smartphone className="w-3.5 h-3.5 text-[#2dd4bf]" />
-            <span className="hidden sm:inline">GPS Active</span>
+            <span className="hidden sm:inline">{t('gps_active', currentLanguage)}</span>
+          </div>
+
+          {/* Unit System Switcher (mph / km/h) */}
+          <div className="flex items-center bg-[#020617]/50 p-1 rounded-lg border border-white/10" title="Switch speed and distance units">
+            <button
+              onClick={() => setUnitSystem('imperial')}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                unitSystem === 'imperial'
+                  ? 'bg-[#2dd4bf] text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>MPH</span>
+            </button>
+            <button
+              onClick={() => setUnitSystem('metric')}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                unitSystem === 'metric'
+                  ? 'bg-[#2dd4bf] text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>KM/H</span>
+            </button>
           </div>
 
           {/* i18n Language Buttons (EN, ES, FR, ZH) */}
@@ -109,7 +138,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           <div className="hidden lg:flex items-center gap-2.5 pl-2 border-l border-white/10">
             <div className="text-right leading-tight">
               <div className="text-xs font-bold text-slate-100">Alex Rivera</div>
-              <div className="text-[10px] font-semibold text-[#2dd4bf]">Safe Driver</div>
+              <div className="text-[10px] font-semibold text-[#2dd4bf]">{t('safe_driver', currentLanguage)}</div>
             </div>
             <div className="w-8 h-8 rounded-full bg-slate-800 border-2 border-[#2dd4bf] overflow-hidden flex items-center justify-center text-xs font-bold text-[#2dd4bf]">
               AR

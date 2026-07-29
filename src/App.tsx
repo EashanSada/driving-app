@@ -6,11 +6,12 @@ import { LeaderboardView } from './components/LeaderboardView';
 import { GamificationView } from './components/GamificationView';
 import { CommunityView } from './components/CommunityView';
 import { HazardMapView } from './components/HazardMapView';
-import { LanguageCode, NavTab } from './types';
+import { LanguageCode, NavTab, UnitSystem } from './types';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('hud');
   const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>('en');
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>('imperial');
   const [hasNativeBridge, setHasNativeBridge] = useState(false);
   const [lastTripSummary, setLastTripSummary] = useState<any>(null);
 
@@ -47,6 +48,8 @@ export default function App() {
         setActiveTab={setActiveTab}
         currentLanguage={currentLanguage}
         setLanguage={handleSetLanguage}
+        unitSystem={unitSystem}
+        setUnitSystem={setUnitSystem}
         hasNativeBridge={hasNativeBridge}
       />
 
@@ -55,6 +58,7 @@ export default function App() {
         {activeTab === 'hud' && (
           <TelematicsHudView
             currentLanguage={currentLanguage}
+            unitSystem={unitSystem}
             onTripCompleted={handleTripCompleted}
             hasNativeBridge={hasNativeBridge}
           />
@@ -64,6 +68,7 @@ export default function App() {
           <RiskAnalysisView
             lastTripSummary={lastTripSummary}
             currentLanguage={currentLanguage}
+            unitSystem={unitSystem}
           />
         )}
 
@@ -73,7 +78,7 @@ export default function App() {
 
         {activeTab === 'community' && <CommunityView />}
 
-        {activeTab === 'hazards' && <HazardMapView />}
+        {activeTab === 'hazards' && <HazardMapView unitSystem={unitSystem} />}
       </main>
 
       {/* Public App Footer */}

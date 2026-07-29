@@ -80,7 +80,7 @@ async function startServer() {
       }
 
       const riskFactors: string[] = [];
-      if (velStdDev > 10.0) riskFactors.append?.("High Speed Fluctuations") || riskFactors.push("High Speed Fluctuations");
+      if (velStdDev > 10.0) riskFactors.push("High Speed Fluctuations");
       if (maxG > 0.55) riskFactors.push("Extreme Acceleration / G-Force Spike");
       if (harshBrakingCount > 0) riskFactors.push(`${harshBrakingCount} Harsh Braking Events`);
       if (harshCorneringCount > 0) riskFactors.push(`${harshCorneringCount} Harsh Cornering Turns`);

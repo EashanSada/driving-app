@@ -1,5 +1,7 @@
 export type LanguageCode = 'en' | 'es' | 'fr' | 'zh';
 
+export type UnitSystem = 'imperial' | 'metric';
+
 export type NavTab = 'hud' | 'analysis' | 'leaderboard' | 'hazards' | 'gamification' | 'community';
 
 export interface TelemetryPoint {
@@ -146,5 +148,14 @@ export interface RouteSearchResult {
   durationMinutes: number;
   safetyRating: 'HIGHLY_SAFE' | 'MODERATE_CAUTION' | 'CONGESTED';
   hazardsEnRoute: number;
+}
+
+declare global {
+  interface Window {
+    DriveSafeBackend: any;
+    TelematicsEngine: any;
+    AndroidBridge: any;
+    DriveSafeApp: any;
+  }
 }
 
