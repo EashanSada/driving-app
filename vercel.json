@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/api/analyze-risk",
+      "destination": "/api/analyze-risk.ts"
+    },
+    {
+      "source": "/api/ai-coach",
+      "destination": "/api/ai-coach.ts"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
