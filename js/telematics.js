@@ -9,19 +9,19 @@ class TelematicsEngine {
     this.canvas = canvasElement;
     this.ctx = canvasElement ? canvasElement.getContext('2d') : null;
     this.isTracking = false;
-    this.simulationMode = 'CITY_COMMUTE'; // SMOOTH, AGGRESSIVE, CITY_COMMUTE
+    this.useDemoSimulation = false;
     this.subscribers = [];
 
-    // Current State Telematics Vector
+    // Current State Telematics Vector - Real Resting Baseline (0.0 km/h)
     this.state = {
-      speedKmh: 45.0,
-      targetSpeedKmh: 45.0,
-      gForceX: 0.05, // Lateral (Left/Right turn)
-      gForceY: 0.10, // Longitudinal (Accel/Braking)
-      gForceZ: 0.98, // Vertical (Gravity)
-      gForceMag: 0.11,
-      jerkMs3: 0.2,
-      headingDeg: 120,
+      speedKmh: 0.0,
+      targetSpeedKmh: 0.0,
+      gForceX: 0.0, // Lateral (Left/Right turn)
+      gForceY: 0.0, // Longitudinal (Accel/Braking)
+      gForceZ: 1.0, // Vertical (Gravity)
+      gForceMag: 0.0,
+      jerkMs3: 0.0,
+      headingDeg: 0,
       harshBrakingCount: 0,
       harshCorneringCount: 0,
       distanceKm: 0.0,
@@ -29,105 +29,160 @@ class TelematicsEngine {
       telemetryHistory: []
     };
 
+    this.lastLat = null;
+    this.lastLng = null;
     this.initSensors();
     if (this.canvas) {
       this.startHudAnimationLoop();
     }
   }
 
-  // Initialize native device orientation / accelerometer sensors if permitted
+  // Initialize live device GPS & accelerometer sensors
   initSensors() {
+    // 1. Live Device Motion (Accelerometer)
     if (window.DeviceMotionEvent) {
       window.addEventListener('devicemotion', (event) => {
-        if (!this.isTracking || window.AndroidBridge) return; // Prefer native Android bridge if present
-        
-        const accel = event.accelerationIncludingGravity;
-        if (accel && accel.x !== null) {
-          // Convert m/s^2 to G-Force
-          this.state.gForceX = accel.x / 9.81;
-          this.state.gForceY = accel.y / 9.81;
-          this.state.gForceZ = accel.z / 9.81;
+        if (!this.isTracking || this.useDemoSimulation) return;
+
+        // Native Android Bridge takes precedence if available
+        if (window.AndroidBridge && typeof window.AndroidBridge.getNativeTelematics === 'function') {
+          try {
+            const rawJson = window.AndroidBridge.getNativeTelematics();
+            const nativeData = JSON.parse(rawJson);
+            this.state.gForceX = nativeData.gForceX || 0;
+            this.state.gForceY = nativeData.gForceY || 0;
+            this.state.gForceZ = nativeData.gForceZ || 1.0;
+            if (typeof nativeData.speedKmh === 'number') {
+              this.state.speedKmh = nativeData.speedKmh;
+            }
+            this.updateMetrics();
+            return;
+          } catch (e) {
+            console.warn('Native Bridge error:', e);
+          }
+        }
+
+        const accel = event.acceleration || event.accelerationIncludingGravity;
+        if (accel && accel.x !== null && accel.x !== undefined) {
+          // Normalize to G (1G = 9.81 m/s^2)
+          this.state.gForceX = parseFloat((accel.x / 9.81).toFixed(2));
+          this.state.gForceY = parseFloat((accel.y / 9.81).toFixed(2));
+          this.state.gForceZ = parseFloat(((accel.z || 9.81) / 9.81).toFixed(2));
           this.updateMetrics();
         }
       });
     }
+
+    // 2. Live GPS Geolocation Watcher
+    if (navigator.geolocation) {
+      try {
+        this.geoWatchId = navigator.geolocation.watchPosition(
+          (position) => {
+            if (!this.isTracking || this.useDemoSimulation) return;
+
+            const coords = position.coords;
+            if (coords) {
+              if (coords.speed !== null && coords.speed !== undefined && !isNaN(coords.speed) && coords.speed >= 0) {
+                // Convert m/s to km/h
+                const realKmh = coords.speed * 3.6;
+                this.state.speedKmh = parseFloat(realKmh.toFixed(1));
+              } else {
+                // Stationary or speed unavailable
+                this.state.speedKmh = 0.0;
+              }
+
+              if (coords.heading !== null && coords.heading !== undefined && !isNaN(coords.heading)) {
+                this.state.headingDeg = Math.round(coords.heading);
+              }
+
+              // Real distance tracking from GPS updates
+              if (this.lastLat !== null && this.lastLng !== null) {
+                const deltaKm = this.calculateDistanceKm(this.lastLat, this.lastLng, coords.latitude, coords.longitude);
+                if (!isNaN(deltaKm) && deltaKm > 0.001) {
+                  this.state.distanceKm += deltaKm;
+                }
+              }
+              this.lastLat = coords.latitude;
+              this.lastLng = coords.longitude;
+            }
+            this.updateMetrics();
+          },
+          (err) => {
+            console.warn('GPS location access notice:', err.message);
+          },
+          {
+            enableHighAccuracy: true,
+            maximumAge: 1000,
+            timeout: 10000
+          }
+        );
+      } catch (err) {
+        console.warn('Geolocation setup notice:', err);
+      }
+    }
   }
 
-  // Start telemetry recording & drive scenario simulation loop
-  startTracking(scenario = 'CITY_COMMUTE') {
+  calculateDistanceKm(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  // Start real telemetry recording
+  startTracking(demoMode = false) {
     this.isTracking = true;
-    this.simulationMode = scenario;
+    this.useDemoSimulation = demoMode;
     this.state.tripStartTime = Date.now();
     this.state.distanceKm = 0.0;
     this.state.harshBrakingCount = 0;
     this.state.harshCorneringCount = 0;
     this.state.telemetryHistory = [];
+    this.state.speedKmh = 0.0;
+    this.state.gForceX = 0.0;
+    this.state.gForceY = 0.0;
+    this.state.gForceZ = 1.0;
 
     if (this.simInterval) clearInterval(this.simInterval);
 
     this.simInterval = setInterval(() => {
       if (!this.isTracking) return;
-      this.simulateSensorTick();
+      
+      if (this.useDemoSimulation) {
+        this.runDemoDriveTick();
+      } else {
+        // Real tracking tick: increment distance if moving
+        if (this.state.speedKmh > 0) {
+          this.state.distanceKm += (this.state.speedKmh / 3600) * 0.25;
+        }
+        this.updateMetrics();
+      }
     }, 250);
+  }
+
+  setDemoSpeed(kmh) {
+    this.useDemoSimulation = true;
+    this.state.speedKmh = Math.max(0, kmh);
+    this.updateMetrics();
+  }
+
+  runDemoDriveTick() {
+    this.state.speedKmh += (Math.random() - 0.48) * 2;
+    this.state.speedKmh = Math.max(0, Math.min(120, this.state.speedKmh));
+    this.state.gForceX = parseFloat(((Math.random() - 0.5) * 0.2).toFixed(2));
+    this.state.gForceY = parseFloat(((Math.random() - 0.48) * 0.2).toFixed(2));
+    this.state.gForceZ = 1.0;
+    this.updateMetrics();
   }
 
   stopTracking() {
     this.isTracking = false;
     if (this.simInterval) clearInterval(this.simInterval);
     return this.getTripSummary();
-  }
-
-  // Simulates realistic vehicle dynamics if native hardware isn't moving
-  simulateSensorTick() {
-    // Check if Native Android Bridge is available
-    if (window.AndroidBridge && typeof window.AndroidBridge.getNativeTelematics === 'function') {
-      try {
-        const rawJson = window.AndroidBridge.getNativeTelematics();
-        const nativeData = JSON.parse(rawJson);
-        this.state.gForceX = nativeData.gForceX || 0;
-        this.state.gForceY = nativeData.gForceY || 0;
-        this.state.gForceZ = nativeData.gForceZ || 1.0;
-      } catch (e) {
-        console.warn('Native Bridge error, falling back to simulator:', e);
-      }
-    } else {
-      // Dynamic Simulation Algorithms based on scenario
-      let speedVariance = 1.2;
-      let targetBaseSpeed = 50;
-      let aggressiveness = 0.2;
-
-      if (this.simulationMode === 'AGGRESSIVE') {
-        targetBaseSpeed = 85;
-        aggressiveness = 0.8;
-      } else if (this.simulationMode === 'SMOOTH') {
-        targetBaseSpeed = 40;
-        aggressiveness = 0.05;
-      }
-
-      // Smooth random walk speed
-      this.state.speedKmh += (Math.random() - 0.48) * (aggressiveness * 8);
-      this.state.speedKmh = Math.max(0, Math.min(130, this.state.speedKmh));
-
-      // G-Force fluctuations
-      const turnEvent = Math.random() < (aggressiveness * 0.25);
-      const brakeEvent = Math.random() < (aggressiveness * 0.20);
-
-      if (turnEvent) {
-        this.state.gForceX = (Math.random() > 0.5 ? 1 : -1) * (0.3 + Math.random() * aggressiveness);
-      } else {
-        this.state.gForceX += (Math.random() - 0.5) * 0.08;
-      }
-
-      if (brakeEvent) {
-        this.state.gForceY = -(0.35 + Math.random() * (aggressiveness * 0.8));
-      } else {
-        this.state.gForceY += (Math.random() - 0.48) * 0.1;
-      }
-
-      this.state.gForceZ = 0.98 + (Math.random() - 0.5) * 0.05;
-    }
-
-    this.updateMetrics();
   }
 
   updateMetrics() {

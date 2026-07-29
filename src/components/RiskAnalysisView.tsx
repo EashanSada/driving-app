@@ -17,40 +17,44 @@ export const RiskAnalysisView: React.FC<RiskAnalysisViewProps> = ({
     status: 'success',
     driver_id: 'anonymous_youth_101',
     trip_summary: {
-      data_points: 120,
-      avg_velocity_kmh: 48.5,
-      max_velocity_kmh: 72.0,
-      velocity_std_dev: 6.4,
-      max_g_force: 0.38,
-      g_force_std_dev: 0.045,
+      data_points: 0,
+      avg_velocity_kmh: 0.0,
+      max_velocity_kmh: 0.0,
+      velocity_std_dev: 0.0,
+      max_g_force: 0.0,
+      g_force_std_dev: 0.0,
       harsh_braking_count: 0,
       harsh_cornering_count: 0
     },
     classification: {
-      risk_score: 18.5,
-      safety_score: 81.5,
+      risk_score: 0.0,
+      safety_score: 100.0,
       risk_category: 'SAFE',
       color_code: '#10b981',
-      vector: [8.2, 5.3, 5.0]
+      vector: [0.0, 0.0, 0.0]
     },
     key_risk_factors: [
-      'Smooth, steady speed control maintained across the trip.',
-      'G-Force vector stayed within the 0.5G safety boundary.'
+      'Vehicle is stationary at 0.0 km/h. No safety hazards detected.',
+      'Smooth baseline motion maintained.'
     ]
   });
 
   const [aiCoachAdvice, setAiCoachAdvice] = useState<string | null>(
-    'Great job keeping your vehicle under control! Maintain a 3-second follow distance to anticipate traffic stops smoothly.'
+    'Vehicle is currently parked or stationary. Start a safe drive from the main dashboard to record real motion telemetry!'
   );
+
+  React.useEffect(() => {
+    if (lastTripSummary) {
+      runAnalysis();
+    }
+  }, [lastTripSummary]);
 
   const runAnalysis = async () => {
     setLoading(true);
     try {
       const payload = lastTripSummary || {
         telemetry: [
-          { velocity: 45, g_force_x: 0.1, g_force_y: 0.1, g_force_z: 0.98, braking_jerk: 0.2 },
-          { velocity: 52, g_force_x: 0.12, g_force_y: -0.2, g_force_z: 1.0, braking_jerk: 0.5 },
-          { velocity: 48, g_force_x: 0.08, g_force_y: 0.1, g_force_z: 0.99, braking_jerk: 0.3 }
+          { velocity: 0, g_force_x: 0, g_force_y: 0, g_force_z: 1.0, braking_jerk: 0 }
         ],
         harshBrakingCount: 0,
         harshCorneringCount: 0

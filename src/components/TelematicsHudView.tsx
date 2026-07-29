@@ -17,14 +17,13 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
   const telematicsEngineRef = useRef<any>(null);
 
   const [isTracking, setIsTracking] = useState(false);
-  const [selectedScenario, setSelectedScenario] = useState<'SMOOTH' | 'CITY_COMMUTE' | 'AGGRESSIVE'>('CITY_COMMUTE');
   const [hudData, setHudData] = useState<TelematicsState>({
-    speedKmh: 48.5,
-    gForceX: 0.08,
-    gForceY: 0.12,
-    gForceZ: 0.98,
-    gForceMag: 0.14,
-    jerkMs3: 0.3,
+    speedKmh: 0.0,
+    gForceX: 0.0,
+    gForceY: 0.0,
+    gForceZ: 1.0,
+    gForceMag: 0.0,
+    jerkMs3: 0.0,
     harshBrakingCount: 0,
     harshCorneringCount: 0,
     distanceKm: 0.0,
@@ -48,9 +47,9 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
     }
   }, []);
 
-  const handleStartTracking = () => {
+  const handleStartTracking = (demoMode = false) => {
     if (telematicsEngineRef.current) {
-      telematicsEngineRef.current.startTracking(selectedScenario);
+      telematicsEngineRef.current.startTracking(demoMode);
       setIsTracking(true);
     }
   };
@@ -93,7 +92,7 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
           <div className="flex items-center gap-3">
             {!isTracking ? (
               <button
-                onClick={handleStartTracking}
+                onClick={() => handleStartTracking(false)}
                 className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#a78bfa] text-slate-950 font-bold hover:shadow-lg hover:shadow-[#2dd4bf]/25 transition-all cursor-pointer glow-mint"
               >
                 <Play className="w-5 h-5 fill-slate-950" />
@@ -225,41 +224,34 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
             </div>
           </div>
 
-          {/* Drive Scenario Selection Bar */}
-          <div className="glass-card p-4">
-            <label className="card-title block mb-2">
-              Drive Profile Preset
-            </label>
-            <div className="grid grid-cols-3 gap-2">
+          {/* Live Sensor Mode Status Card */}
+          <div className="glass-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="card-title mb-0 flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-[#2dd4bf]" /> Sensor Tracking Mode
+              </span>
+              <span className="text-[11px] font-semibold text-[#2dd4bf] bg-[#2dd4bf]/10 px-2.5 py-0.5 rounded-full border border-[#2dd4bf]/20">
+                100% Real Sensors
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              Reads live device GPS velocity and motion accelerometer sensors. When stationary, values remain at 0.0 km/h.
+            </p>
+
+            {/* Optional Test Motion Throttle for Stationary Testing */}
+            <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs text-slate-400">
+              <span>Stationary Desktop Test:</span>
               <button
-                onClick={() => setSelectedScenario('SMOOTH')}
-                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  selectedScenario === 'SMOOTH'
-                    ? 'bg-[#2dd4bf]/20 text-[#2dd4bf] border border-[#2dd4bf]/40 shadow'
-                    : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-white/5'
-                }`}
+                onClick={() => {
+                  if (telematicsEngineRef.current) {
+                    if (!isTracking) handleStartTracking(true);
+                    telematicsEngineRef.current.setDemoSpeed(45);
+                  }
+                }}
+                className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[#2dd4bf] text-[11px] font-medium border border-white/10 cursor-pointer"
               >
-                Smooth Cruising
-              </button>
-              <button
-                onClick={() => setSelectedScenario('CITY_COMMUTE')}
-                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  selectedScenario === 'CITY_COMMUTE'
-                    ? 'bg-[#a78bfa]/20 text-[#a78bfa] border border-[#a78bfa]/40 shadow'
-                    : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-white/5'
-                }`}
-              >
-                City Commute
-              </button>
-              <button
-                onClick={() => setSelectedScenario('AGGRESSIVE')}
-                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  selectedScenario === 'AGGRESSIVE'
-                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow'
-                    : 'bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-white/5'
-                }`}
-              >
-                Aggressive Drive
+                Simulate 45 km/h Motion
               </button>
             </div>
           </div>
