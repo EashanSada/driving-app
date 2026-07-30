@@ -78,9 +78,19 @@ class TelematicsEngine {
         const accel = event.acceleration || event.accelerationIncludingGravity;
         if (accel && accel.x !== null && accel.x !== undefined) {
           // Normalize to G (1G = 9.81 m/s^2)
-          this.state.gForceX = parseFloat((accel.x / 9.81).toFixed(2));
-          this.state.gForceY = parseFloat((accel.y / 9.81).toFixed(2));
-          this.state.gForceZ = parseFloat(((accel.z || 9.81) / 9.81).toFixed(2));
+          const rawGx = accel.x / 9.81;
+          const rawGy = accel.y / 9.81;
+          const rawGz = (accel.z || 9.81) / 9.81;
+
+          // Apply Low-pass Exponential Moving Average Filter (alpha = 0.3) to dampen high-frequency road vibrations (train tracks/potholes)
+          const alpha = 0.3;
+          this.filteredGx = this.filteredGx !== undefined ? (this.filteredGx * (1 - alpha) + rawGx * alpha) : rawGx;
+          this.filteredGy = this.filteredGy !== undefined ? (this.filteredGy * (1 - alpha) + rawGy * alpha) : rawGy;
+          this.filteredGz = this.filteredGz !== undefined ? (this.filteredGz * (1 - alpha) + rawGz * alpha) : rawGz;
+
+          this.state.gForceX = parseFloat(this.filteredGx.toFixed(2));
+          this.state.gForceY = parseFloat(this.filteredGy.toFixed(2));
+          this.state.gForceZ = parseFloat(this.filteredGz.toFixed(2));
           this.updateMetrics();
         }
       });
@@ -96,9 +106,9 @@ class TelematicsEngine {
             const coords = position.coords;
             if (coords) {
               if (coords.speed !== null && coords.speed !== undefined && !isNaN(coords.speed) && coords.speed >= 0) {
-                // Convert m/s to km/h
+                // Convert m/s to km/h (filter out noise below 1 km/h)
                 const realKmh = coords.speed * 3.6;
-                this.state.speedKmh = parseFloat(realKmh.toFixed(1));
+                this.state.speedKmh = realKmh >= 1.0 ? parseFloat(realKmh.toFixed(1)) : 0.0;
               } else {
                 // Stationary or speed unavailable
                 this.state.speedKmh = 0.0;
@@ -108,13 +118,6 @@ class TelematicsEngine {
                 this.state.headingDeg = Math.round(coords.heading);
               }
 
-              // Real distance tracking from GPS updates
-              if (this.lastLat !== null && this.lastLng !== null) {
-                const deltaKm = this.calculateDistanceKm(this.lastLat, this.lastLng, coords.latitude, coords.longitude);
-                if (!isNaN(deltaKm) && deltaKm > 0.001) {
-                  this.state.distanceKm += deltaKm;
-                }
-              }
               this.lastLat = coords.latitude;
               this.lastLng = coords.longitude;
             }
@@ -152,6 +155,7 @@ class TelematicsEngine {
     this.isTracking = true;
     this.useDemoSimulation = demoMode;
     this.state.tripStartTime = Date.now();
+    this.lastMetricsTime = Date.now();
     this.state.distanceKm = 0.0;
     this.state.harshBrakingCount = 0;
     this.state.harshCorneringCount = 0;
@@ -169,10 +173,6 @@ class TelematicsEngine {
       if (this.useDemoSimulation) {
         this.runDemoDriveTick();
       } else {
-        // Real tracking tick: increment distance if moving
-        if (this.state.speedKmh > 0) {
-          this.state.distanceKm += (this.state.speedKmh / 3600) * 0.25;
-        }
         this.updateMetrics();
       }
     }, 250);
@@ -200,6 +200,20 @@ class TelematicsEngine {
   }
 
   updateMetrics() {
+    // 1. Calculate precise wall-clock time delta since last metrics update
+    const now = Date.now();
+    if (this.isTracking && this.lastMetricsTime) {
+      const dtSeconds = (now - this.lastMetricsTime) / 1000;
+      // Cap dt to prevent massive jumps when tab is backgrounded
+      if (dtSeconds > 0 && dtSeconds < 2.0) {
+        if (this.state.speedKmh > 0) {
+          // distance = (speed in km/h / 3600 s/h) * dtSeconds
+          this.state.distanceKm += (this.state.speedKmh / 3600) * dtSeconds;
+        }
+      }
+    }
+    this.lastMetricsTime = now;
+
     // Calculate total G-Force magnitude minus gravity
     const netZ = this.state.gForceZ - 1.0;
     this.state.gForceMag = Math.sqrt(
@@ -211,19 +225,33 @@ class TelematicsEngine {
     // Calculate Jerk (m/s^3)
     this.state.jerkMs3 = Math.abs(this.state.gForceY) * 9.81 * 0.4;
 
-    // Detect harsh events
+    // Detect harsh events with road bump (train tracks / pothole) suppression
+    // Train tracks create high vertical shock (|netZ| > 0.5) without sustained deceleration.
+    const isVerticalRoadBump = Math.abs(netZ) > 0.5;
+
+    // Harsh Braking: Require gForceY < -0.42 AND avoid single-tick vertical shock spikes
     if (this.state.gForceY < -0.42) {
-      this.state.harshBrakingCount++;
-      if (window.AndroidBridge && window.AndroidBridge.triggerHapticWarning) {
-        window.AndroidBridge.triggerHapticWarning('HARSH_BRAKING');
+      this.brakingTicks = (this.brakingTicks || 0) + 1;
+      // Require sustained g-force for 2 consecutive ticks (~500ms) or non-bump event
+      if (this.brakingTicks === 2 && !isVerticalRoadBump) {
+        this.state.harshBrakingCount++;
+        if (window.AndroidBridge && window.AndroidBridge.triggerHapticWarning) {
+          window.AndroidBridge.triggerHapticWarning('HARSH_BRAKING');
+        }
       }
-    }
-    if (Math.abs(this.state.gForceX) > 0.45) {
-      this.state.harshCorneringCount++;
+    } else {
+      this.brakingTicks = 0;
     }
 
-    // Distance increment (speed * time delta 0.25s)
-    this.state.distanceKm += (this.state.speedKmh / 3600) * 0.25;
+    // Harsh Cornering: Require |gForceX| > 0.45 sustained for 2 ticks and not a vertical bump
+    if (Math.abs(this.state.gForceX) > 0.45) {
+      this.corneringTicks = (this.corneringTicks || 0) + 1;
+      if (this.corneringTicks === 2 && !isVerticalRoadBump) {
+        this.state.harshCorneringCount++;
+      }
+    } else {
+      this.corneringTicks = 0;
+    }
 
     // Record time-series telemetry data point
     const point = {

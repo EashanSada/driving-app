@@ -124,7 +124,10 @@ export function recordTripForActiveUser(tripSummary: any, unitSystem: UnitSystem
   const account = getAccount(activeUsername);
 
   // Calculate trip physics
-  const distanceKm = tripSummary?.distance_km || tripSummary?.trip_summary?.avg_velocity_kmh ? 1.5 : 1.0;
+  const rawDist = typeof tripSummary?.distanceKm === 'number'
+    ? tripSummary.distanceKm
+    : (typeof tripSummary?.distance_km === 'number' ? tripSummary.distance_km : 0);
+  const distanceKm = rawDist > 0 ? rawDist : 1.0;
   const distanceMiles = distanceKm * 0.621371;
   const durationSeconds = tripSummary?.duration_seconds || 120;
   

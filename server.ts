@@ -56,9 +56,26 @@ async function startServer() {
       const maxG = Math.max(...gMags);
       const gStdDev = Math.sqrt(gMags.reduce((sum, g) => sum + Math.pow(g - avgG, 2), 0) / n);
 
-      const harshBrakingCount = gy.filter(y => y < -0.4).length;
-      const harshCorneringCount = gx.filter(x => Math.abs(x) > 0.45).length;
-      const highJerkEvents = jerks.filter(j => j > 2.5).length;
+      // Software Mitigation: Filter out road surface bumps (train tracks / potholes)
+      // High vertical acceleration |gz - 1.0| > 0.5 without speed deceleration indicates road bump noise rather than aggressive driving.
+      let harshBrakingCount = 0;
+      let harshCorneringCount = 0;
+      let highJerkEvents = 0;
+
+      for (let i = 0; i < n; i++) {
+        const isVerticalShock = Math.abs(gz[i] - 1.0) > 0.55;
+        const hasDeceleration = i > 0 && (velocities[i-1] - velocities[i] >= 0.5);
+
+        if (gy[i] < -0.42 && (!isVerticalShock || hasDeceleration)) {
+          harshBrakingCount++;
+        }
+        if (Math.abs(gx[i]) > 0.45 && !isVerticalShock) {
+          harshCorneringCount++;
+        }
+        if (jerks[i] > 2.5 && !isVerticalShock) {
+          highJerkEvents++;
+        }
+      }
 
       // Risk Scoring Heuristics
       const baseRisk = 10.0;
