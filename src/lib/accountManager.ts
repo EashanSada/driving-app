@@ -1,4 +1,5 @@
 import { UnitSystem } from '../types';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 export interface TripRecord {
   id: string;
@@ -94,6 +95,24 @@ export function saveAccount(account: UserAccount): void {
     const allMap = getAccountsMap();
     allMap[account.username.toLowerCase()] = account;
     localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(allMap));
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.from('driver_scores').upsert({
+        user_id: account.username,
+        current_safety_score: account.safetyScore,
+        total_trips_logged: account.totalTrips,
+        clean_trips_count: account.cleanTrips,
+        total_distance_km: (account.totalDistanceMiles / 0.621371).toFixed(2),
+        badge_level: account.badgesUnlocked.includes('PLATINUM_GUARDIAN') ? 'PLATINUM_GUARDIAN' : 'GOLD_GUARDIAN',
+        points_earned: account.points,
+        driver_level: account.level,
+        driver_xp: account.currentXp,
+        badges_unlocked: account.badgesUnlocked,
+        updated_at: new Date().toISOString()
+      }).then(({ error }) => {
+        if (error) console.warn('Supabase driver_scores sync notice:', error.message);
+      });
+    }
   } catch (err) {
     console.error('Failed to save account:', err);
   }
