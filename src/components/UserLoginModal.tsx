@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { User, ShieldAlert, ArrowRight, CheckCircle2, Trophy, Phone, Mail, Users, ArrowLeft, X } from 'lucide-react';
-import { accountExists, createAccount, getAccount, getAllAccounts, setActiveUsername, UserAccount } from '../lib/accountManager';
+import { User, ShieldAlert, ArrowRight, CheckCircle2, Trophy, Phone, Mail, Users, ArrowLeft, Loader2 } from 'lucide-react';
+import { accountExists, createAccount, fetchAccountFromSupabase, getAccount, getAllAccounts, setActiveUsername, UserAccount } from '../lib/accountManager';
 
 interface UserLoginModalProps {
   isOpen: boolean;
@@ -18,6 +18,7 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
   const [step, setStep] = useState<'USERNAME' | 'REGISTER'>('USERNAME');
   const [usernameInput, setUsernameInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Registration Form State
   const [fullName, setFullName] = useState('');
@@ -31,7 +32,7 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleUsernameSubmit = (e: React.FormEvent) => {
+  const handleUsernameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const clean = usernameInput.trim();
     if (!clean) {
@@ -43,16 +44,34 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
       return;
     }
 
-    // Check if account exists
-    if (accountExists(clean)) {
-      // Existing user: direct login
-      setActiveUsername(clean);
-      onLoginSuccess(clean);
-      resetModalState();
-    } else {
-      // New user: proceed to registration form
-      setErrorMsg('');
+    setIsSubmitting(true);
+    setErrorMsg('');
+
+    try {
+      // 1. Check local storage first
+      if (accountExists(clean)) {
+        setActiveUsername(clean);
+        onLoginSuccess(clean);
+        resetModalState();
+        return;
+      }
+
+      // 2. Check Supabase cloud database
+      const cloudAccount = await fetchAccountFromSupabase(clean);
+      if (cloudAccount) {
+        setActiveUsername(clean);
+        onLoginSuccess(clean);
+        resetModalState();
+        return;
+      }
+
+      // 3. New user: proceed to registration form
       setStep('REGISTER');
+    } catch (err) {
+      console.error('Login submit check failed:', err);
+      setStep('REGISTER');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -174,10 +193,20 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
 
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#38bdf8] text-slate-950 font-extrabold text-sm hover:shadow-lg transition-all cursor-pointer glow-mint flex items-center justify-center gap-2"
+                  disabled={isSubmitting}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#38bdf8] text-slate-950 font-extrabold text-sm hover:shadow-lg transition-all cursor-pointer glow-mint flex items-center justify-center gap-2 disabled:opacity-60"
                 >
-                  <span>Continue</span>
-                  <ArrowRight className="w-4 h-4" />
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Checking Account...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Continue</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               </form>
 

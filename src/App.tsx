@@ -8,7 +8,7 @@ import { HazardMapView } from './components/HazardMapView';
 import { UserLoginModal } from './components/UserLoginModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { LanguageCode, NavTab, UnitSystem } from './types';
-import { getAccount, getActiveUsername, UserAccount } from './lib/accountManager';
+import { fetchAccountFromSupabase, getAccount, getActiveUsername, UserAccount } from './lib/accountManager';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('hud');
@@ -31,11 +31,21 @@ export default function App() {
 
     // Initialize active username
     const savedUser = getActiveUsername();
-    const account = savedUser ? getAccount(savedUser) : null;
-    
-    if (savedUser && account) {
-      setActiveUsernameState(savedUser);
-      setActiveAccount(account);
+    if (savedUser) {
+      const localAcc = getAccount(savedUser);
+      if (localAcc) {
+        setActiveUsernameState(savedUser);
+        setActiveAccount(localAcc);
+      } else {
+        fetchAccountFromSupabase(savedUser).then((cloudAcc) => {
+          if (cloudAcc) {
+            setActiveUsernameState(savedUser);
+            setActiveAccount(cloudAcc);
+          } else {
+            setIsLoginModalOpen(true);
+          }
+        });
+      }
     } else {
       // Auto open login modal if no valid user logged in
       setIsLoginModalOpen(true);

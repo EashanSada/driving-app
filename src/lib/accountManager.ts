@@ -127,27 +127,86 @@ export function createAccount(data: {
   return newAccount;
 }
 
+export async function fetchAccountFromSupabase(username: string): Promise<UserAccount | null> {
+  const cleanName = username.trim().toLowerCase();
+  if (!cleanName || !isSupabaseConfigured || !supabase) return null;
+
+  try {
+    // Try primary driver_accounts table
+    const { data, error } = await supabase
+      .from('driver_accounts')
+      .select('*')
+      .eq('username', cleanName)
+      .maybeSingle();
+
+    if (!error && data) {
+      const parsedAccount: UserAccount = data.account_data || {
+        username: data.username || cleanName,
+        fullName: data.full_name || cleanName,
+        phone: data.phone || '',
+        email: data.email || '',
+        parentName: data.parent_name || '',
+        parentPhone: data.parent_phone || '',
+        parentEmail: data.parent_email || '',
+        createdTime: data.created_time || Date.now(),
+        safetyScore: data.safety_score ?? 100,
+        cleanTrips: data.clean_trips ?? 0,
+        totalTrips: data.total_trips ?? 0,
+        totalDistanceMiles: data.total_distance_miles ?? 0,
+        points: data.points ?? 0,
+        level: data.level ?? 1,
+        currentXp: data.current_xp ?? 0,
+        nextLevelXp: data.next_level_xp ?? 1000,
+        badgesUnlocked: data.badges_unlocked || [],
+        tripHistory: data.trip_history || []
+      };
+
+      // Save locally
+      const allMap = getAccountsMap();
+      allMap[cleanName] = parsedAccount;
+      localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(allMap));
+      return parsedAccount;
+    }
+  } catch (err) {
+    console.warn('Supabase account fetch notice:', err);
+  }
+
+  return null;
+}
+
 export function saveAccount(account: UserAccount): void {
   try {
+    const cleanKey = account.username.toLowerCase();
     const allMap = getAccountsMap();
-    allMap[account.username.toLowerCase()] = account;
+    allMap[cleanKey] = account;
     localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(allMap));
 
     if (isSupabaseConfigured && supabase) {
-      supabase.from('driver_scores').upsert({
-        user_id: account.username,
-        current_safety_score: account.safetyScore,
-        total_trips_logged: account.totalTrips,
-        clean_trips_count: account.cleanTrips,
-        total_distance_km: (account.totalDistanceMiles / 0.621371).toFixed(2),
-        badge_level: account.badgesUnlocked.includes('PLATINUM_GUARDIAN') ? 'PLATINUM_GUARDIAN' : 'GOLD_GUARDIAN',
-        points_earned: account.points,
-        driver_level: account.level,
-        driver_xp: account.currentXp,
+      // Sync to Supabase driver_accounts
+      supabase.from('driver_accounts').upsert({
+        username: cleanKey,
+        full_name: account.fullName,
+        phone: account.phone || '',
+        email: account.email || '',
+        parent_name: account.parentName || '',
+        parent_phone: account.parentPhone || '',
+        parent_email: account.parentEmail || '',
+        safety_score: account.safetyScore,
+        clean_trips: account.cleanTrips,
+        total_trips: account.totalTrips,
+        total_distance_miles: account.totalDistanceMiles,
+        points: account.points,
+        level: account.level,
+        current_xp: account.currentXp,
+        next_level_xp: account.nextLevelXp,
         badges_unlocked: account.badgesUnlocked,
+        trip_history: account.tripHistory,
+        account_data: account,
         updated_at: new Date().toISOString()
-      }).then(({ error }) => {
-        if (error) console.warn('Supabase driver_scores sync notice:', error.message);
+      }, { onConflict: 'username' }).then(({ error }) => {
+        if (error) {
+          console.warn('Supabase driver_accounts sync notice:', error.message);
+        }
       });
     }
   } catch (err) {

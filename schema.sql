@@ -12,6 +12,42 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TYPE risk_level_enum AS ENUM ('SAFE', 'MODERATE', 'HIGH_RISK');
 CREATE TYPE hazard_type_enum AS ENUM ('POTHOLE', 'BLACK_ICE', 'HIGH_ACCIDENT_ZONE', 'POOR_LIGHTING', 'CONSTRUCTION');
 
+-- 2B. DRIVER ACCOUNTS TABLE (Seamless Username-Based Authentication & Cloud Storage)
+CREATE TABLE IF NOT EXISTS public.driver_accounts (
+    username TEXT PRIMARY KEY,
+    full_name TEXT,
+    phone TEXT,
+    email TEXT,
+    parent_name TEXT,
+    parent_phone TEXT,
+    parent_email TEXT,
+    safety_score NUMERIC DEFAULT 100.0,
+    clean_trips INT DEFAULT 0,
+    total_trips INT DEFAULT 0,
+    total_distance_miles NUMERIC DEFAULT 0.0,
+    points INT DEFAULT 0,
+    level INT DEFAULT 1,
+    current_xp INT DEFAULT 0,
+    next_level_xp INT DEFAULT 1000,
+    badges_unlocked TEXT[] DEFAULT ARRAY[]::TEXT[],
+    trip_history JSONB DEFAULT '[]'::jsonb,
+    account_data JSONB DEFAULT '{}'::jsonb,
+    created_time BIGINT DEFAULT (EXTRACT(epoch FROM NOW()) * 1000),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS & Public Access Policies for driver_accounts
+ALTER TABLE public.driver_accounts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public select driver_accounts" ON public.driver_accounts;
+CREATE POLICY "Allow public select driver_accounts" ON public.driver_accounts FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow public insert driver_accounts" ON public.driver_accounts;
+CREATE POLICY "Allow public insert driver_accounts" ON public.driver_accounts FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public update driver_accounts" ON public.driver_accounts;
+CREATE POLICY "Allow public update driver_accounts" ON public.driver_accounts FOR UPDATE USING (true);
+
 -- 3. PROFILES TABLE (Syncs with Supabase Auth auth.users)
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
