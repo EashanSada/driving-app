@@ -46,38 +46,7 @@ const HazardMarkerWithInfoWindow: React.FC<{ hazard: HazardReport; onUpvote: (id
 }
 
 export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSystem = 'imperial' }) => {
-  const [hazards, setHazards] = useState<HazardReport[]>([
-    {
-      id: 'haz_1',
-      hazard_type: 'POTHOLE',
-      description: 'Deep pothole on right lane of Highway 101 North exit 12',
-      lat: 37.7749,
-      lng: -122.4194,
-      upvotes: 14,
-      time: '12m ago',
-      source_app: 'ANDROID_NATIVE'
-    },
-    {
-      id: 'haz_2',
-      hazard_type: 'HIGH_ACCIDENT_ZONE',
-      description: 'Blind intersection near High School entrance - slow down',
-      lat: 37.7833,
-      lng: -122.4167,
-      upvotes: 28,
-      time: '1h ago',
-      source_app: 'WEB_APP'
-    },
-    {
-      id: 'haz_3',
-      hazard_type: 'BLACK_ICE',
-      description: 'Morning frost on bridge overpass near Market St',
-      lat: 37.7650,
-      lng: -122.4300,
-      upvotes: 9,
-      time: '3h ago',
-      source_app: 'ANDROID_NATIVE'
-    }
-  ]);
+  const [hazards, setHazards] = useState<HazardReport[]>([]);
 
   const [showModal, setShowModal] = useState(false);
   const [newHazardType, setNewHazardType] = useState<HazardReport['hazard_type']>('POTHOLE');

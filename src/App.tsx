@@ -6,6 +6,7 @@ import { LeaderboardView } from './components/LeaderboardView';
 import { GamificationView } from './components/GamificationView';
 import { HazardMapView } from './components/HazardMapView';
 import { UserLoginModal } from './components/UserLoginModal';
+import { UserProfileModal } from './components/UserProfileModal';
 import { LanguageCode, NavTab, UnitSystem } from './types';
 import { getAccount, getActiveUsername, UserAccount } from './lib/accountManager';
 
@@ -20,6 +21,7 @@ export default function App() {
   const [activeUsername, setActiveUsernameState] = useState<string | null>(null);
   const [activeAccount, setActiveAccount] = useState<UserAccount | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   useEffect(() => {
     // Check if Native Android Bridge is present
@@ -29,11 +31,13 @@ export default function App() {
 
     // Initialize active username
     const savedUser = getActiveUsername();
-    if (savedUser) {
+    const account = savedUser ? getAccount(savedUser) : null;
+    
+    if (savedUser && account) {
       setActiveUsernameState(savedUser);
-      setActiveAccount(getAccount(savedUser));
+      setActiveAccount(account);
     } else {
-      // Auto open login modal if no user logged in
+      // Auto open login modal if no valid user logged in
       setIsLoginModalOpen(true);
     }
 
@@ -47,6 +51,12 @@ export default function App() {
     setActiveUsernameState(username);
     setActiveAccount(getAccount(username));
     setIsLoginModalOpen(false);
+  };
+
+  const handleLogout = () => {
+    setActiveUsernameState(null);
+    setActiveAccount(null);
+    setIsLoginModalOpen(true);
   };
 
   const handleSetLanguage = (lang: LanguageCode) => {
@@ -73,7 +83,19 @@ export default function App() {
         isOpen={isLoginModalOpen}
         onLoginSuccess={handleLoginSuccess}
         onClose={() => setIsLoginModalOpen(false)}
-        allowCancel={Boolean(activeUsername)}
+        allowCancel={Boolean(activeUsername && activeAccount)}
+      />
+
+      {/* User Profile View Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        account={activeAccount}
+        onClose={() => setIsProfileModalOpen(false)}
+        onSwitchAccount={() => {
+          setIsProfileModalOpen(false);
+          setIsLoginModalOpen(true);
+        }}
+        onLogout={handleLogout}
       />
 
       {/* Sticky Header */}
@@ -87,7 +109,13 @@ export default function App() {
         hasNativeBridge={hasNativeBridge}
         activeUsername={activeUsername}
         activeAccount={activeAccount}
-        onOpenLoginModal={() => setIsLoginModalOpen(true)}
+        onOpenLoginModal={() => {
+          if (activeUsername && activeAccount) {
+            setIsProfileModalOpen(true);
+          } else {
+            setIsLoginModalOpen(true);
+          }
+        }}
       />
 
       {/* Main Content Viewport */}

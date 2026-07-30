@@ -14,6 +14,11 @@ export interface TripRecord {
 export interface UserAccount {
   username: string;
   fullName: string;
+  phone?: string;
+  email?: string;
+  parentName?: string;
+  parentPhone?: string;
+  parentEmail?: string;
   createdTime: number;
   safetyScore: number;
   cleanTrips: number;
@@ -43,11 +48,24 @@ export function setActiveUsername(username: string): void {
     const cleanName = username.trim();
     if (!cleanName) return;
     localStorage.setItem(ACTIVE_USER_KEY, cleanName);
-    // Ensure account object exists in account map
-    getAccount(cleanName);
   } catch (err) {
     console.error('Failed to set active username:', err);
   }
+}
+
+export function clearActiveUsername(): void {
+  try {
+    localStorage.removeItem(ACTIVE_USER_KEY);
+  } catch (err) {
+    console.error('Failed to clear active username:', err);
+  }
+}
+
+export function accountExists(username: string): boolean {
+  const cleanName = username.trim().toLowerCase();
+  if (!cleanName) return false;
+  const allMap = getAccountsMap();
+  return Boolean(allMap[cleanName]);
 }
 
 export function getAllAccounts(): UserAccount[] {
@@ -61,18 +79,36 @@ export function getAllAccounts(): UserAccount[] {
   }
 }
 
-export function getAccount(username: string): UserAccount {
+export function getAccount(username: string): UserAccount | null {
   const cleanName = username.trim();
+  if (!cleanName) return null;
   const allMap = getAccountsMap();
   
   if (allMap[cleanName.toLowerCase()]) {
     return allMap[cleanName.toLowerCase()];
   }
 
-  // Create new real account
+  return null;
+}
+
+export function createAccount(data: {
+  username: string;
+  fullName: string;
+  phone: string;
+  email: string;
+  parentName: string;
+  parentPhone: string;
+  parentEmail: string;
+}): UserAccount {
+  const cleanName = data.username.trim();
   const newAccount: UserAccount = {
     username: cleanName,
-    fullName: cleanName,
+    fullName: data.fullName.trim() || cleanName,
+    phone: data.phone.trim(),
+    email: data.email.trim(),
+    parentName: data.parentName.trim(),
+    parentPhone: data.parentPhone.trim(),
+    parentEmail: data.parentEmail.trim(),
     createdTime: Date.now(),
     safetyScore: 100,
     cleanTrips: 0,
@@ -87,6 +123,7 @@ export function getAccount(username: string): UserAccount {
   };
 
   saveAccount(newAccount);
+  setActiveUsername(cleanName);
   return newAccount;
 }
 
@@ -141,6 +178,7 @@ export function recordTripForActiveUser(tripSummary: any, unitSystem: UnitSystem
   if (!activeUsername) return null;
 
   const account = getAccount(activeUsername);
+  if (!account) return null;
 
   // Calculate trip physics
   const rawDist = typeof tripSummary?.distanceKm === 'number'
