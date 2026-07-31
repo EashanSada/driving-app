@@ -34,12 +34,15 @@
     <!-- React Main App Entry -->
     <script type="module" src="/src/main.tsx"></script>
 
-    <!-- PWA Service Worker Registration -->
+    <!-- PWA Service Worker Registration & Cache Purge -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('DriveSafe Service Worker registered:', reg.scope))
+            .then(reg => {
+              reg.update();
+              console.log('DriveSafe Service Worker updated:', reg.scope);
+            })
             .catch(err => console.log('Service Worker registration failed:', err));
         });
       }

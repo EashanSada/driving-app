@@ -61,20 +61,20 @@ export const translations = {
     high_risk_level: 'HIGH RISK',
 
     // Leaderboard
-    leaderboard_title: 'Global Youth Safe Driver Champions',
-    leaderboard_desc: 'Safe youth drivers earning rewards and clean trip badges.',
+    leaderboard_title: 'Registered Driver Leaderboard',
+    leaderboard_desc: 'Ranks registered drivers by real logged safety scores and clean trip performance.',
     rank: 'Rank',
-    driver: 'Youth Driver',
-    cohort: 'Youth Cohort',
+    driver: 'Driver Username',
+    cohort: 'Driver Group',
     clean_trips: 'Clean Trips',
     points: 'Points',
-    filter_all: 'All Cohorts',
+    filter_all: 'All Drivers',
     filter_top: 'Top Performers',
 
     // Gamification
     badges_title: 'Driver Milestones & Trophies',
     badges_desc: 'Earn points and unlock badges by maintaining safe driving habits.',
-    daily_quests: 'Daily Youth Quests',
+    daily_quests: 'Daily Driver Challenges',
     quest_desc: 'Complete daily driving challenges for bonus points.',
     unlocked: 'Unlocked',
     locked: 'In Progress',
@@ -82,10 +82,10 @@ export const translations = {
     current_level: 'Level 4 Safe Driver',
 
     // Community
-    community_title: 'Youth Driver Community & Safety Cohorts',
-    community_desc: 'Form driver groups, share driving safety achievements, and chat in real-time.',
+    community_title: 'Driver Community & Safe Networking',
+    community_desc: 'Connect with verified drivers and track safety milestones.',
     active_groups: 'Active Groups',
-    group_chat: 'Youth Group Chat',
+    group_chat: 'Driver Group Chat',
     join_group: 'Join Group',
     send: 'Send',
     members: 'members',
