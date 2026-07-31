@@ -1,5 +1,5 @@
 import { UnitSystem } from '../types';
-import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient';
 
 export interface TripRecord {
   id: string;
@@ -129,15 +129,31 @@ export function createAccount(data: {
 
 export async function fetchAccountFromSupabase(username: string): Promise<UserAccount | null> {
   const cleanName = username.trim();
-  if (!cleanName || !isSupabaseConfigured || !supabase) return null;
+  if (!cleanName) return null;
+
+  const client = getSupabaseClient();
+  if (!client) return null;
 
   try {
-    // Case-insensitive query on driver_accounts
-    const { data, error } = await supabase
+    const cleanLower = cleanName.toLowerCase();
+    
+    // First try exact lowercase match
+    let { data, error } = await client
       .from('driver_accounts')
       .select('*')
-      .ilike('username', cleanName)
+      .eq('username', cleanLower)
       .maybeSingle();
+
+    // If not found, try case-insensitive ilike match
+    if (!data) {
+      const res = await client
+        .from('driver_accounts')
+        .select('*')
+        .ilike('username', cleanName)
+        .maybeSingle();
+      data = res.data;
+      error = res.error;
+    }
 
     if (!error && data) {
       const parsedAccount: UserAccount = data.account_data || {
@@ -176,10 +192,11 @@ export async function fetchAccountFromSupabase(username: string): Promise<UserAc
 
 export async function fetchAllAccountsFromSupabase(): Promise<UserAccount[]> {
   const localAccounts = getAllAccounts();
-  if (!isSupabaseConfigured || !supabase) return localAccounts;
+  const client = getSupabaseClient();
+  if (!client) return localAccounts;
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('driver_accounts')
       .select('*')
       .order('safety_score', { ascending: false });
@@ -230,7 +247,7 @@ export function saveAccount(account: UserAccount): void {
     allMap[cleanKey] = account;
     localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(allMap));
 
-    if (isSupabaseConfigured && supabase) {
+    if (getSupabaseClient()) {
       saveAccountAsync(account).catch(err => console.warn('Background save warning:', err));
     }
   } catch (err) {
@@ -240,8 +257,9 @@ export function saveAccount(account: UserAccount): void {
 
 export async function saveAccountAsync(account: UserAccount): Promise<void> {
   const cleanKey = account.username.toLowerCase();
+  const client = getSupabaseClient();
   
-  if (!isSupabaseConfigured || !supabase) return;
+  if (!client) return;
 
   try {
     const payload = {
@@ -266,7 +284,7 @@ export async function saveAccountAsync(account: UserAccount): Promise<void> {
       updated_at: new Date().toISOString()
     };
 
-    const { error } = await supabase
+    const { error } = await client
       .from('driver_accounts')
       .upsert(payload, { onConflict: 'username' });
 

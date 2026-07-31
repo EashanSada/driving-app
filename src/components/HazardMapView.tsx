@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useAdvancedMarkerRef } from '@vis.gl/react-google-maps';
 import { AlertTriangle, MapPin, ThumbsUp, Plus, ShieldAlert, Navigation, Search, Smartphone, Globe, Sparkles, Route } from 'lucide-react';
 import { HazardReport, RouteSearchResult, UnitSystem } from '../types';
-import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
+import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabaseClient';
 
 const API_KEY =
   process.env.GOOGLE_MAPS_PLATFORM_KEY ||
@@ -63,8 +63,9 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
   useEffect(() => {
     fetchHazards();
 
-    if (isSupabaseConfigured && supabase) {
-      const channel = supabase
+    const client = getSupabaseClient();
+    if (client) {
+      const channel = client
         .channel('public_road_hazards_channel')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'road_hazards' }, () => {
           fetchHazards();
@@ -72,15 +73,16 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
         .subscribe();
 
       return () => {
-        supabase.removeChannel(channel);
+        client.removeChannel(channel);
       };
     }
   }, []);
 
   const fetchHazards = async () => {
     try {
-      if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase
+      const client = getSupabaseClient();
+      if (client) {
+        const { data, error } = await client
           .from('road_hazards')
           .select('*')
           .order('created_at', { ascending: false });
@@ -136,8 +138,9 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
     setHazards(prev => [newReport, ...prev]);
 
     try {
-      if (isSupabaseConfigured && supabase) {
-        await supabase.from('road_hazards').insert({
+      const client = getSupabaseClient();
+      if (client) {
+        await client.from('road_hazards').insert({
           id: newReport.id,
           hazard_type: newReport.hazard_type,
           description: newReport.description,
@@ -175,8 +178,9 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
     setHazards(prev => prev.map(h => {
       if (h.id === id) {
         const updatedUpvotes = h.upvotes + 1;
-        if (isSupabaseConfigured && supabase) {
-          supabase.from('road_hazards').update({ upvotes: updatedUpvotes }).eq('id', id).then();
+        const client = getSupabaseClient();
+        if (client) {
+          client.from('road_hazards').update({ upvotes: updatedUpvotes }).eq('id', id).then();
         }
         return { ...h, upvotes: updatedUpvotes };
       }
