@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useAdvancedMarkerRef } from '@vis.gl/react-google-maps';
 import { AlertTriangle, MapPin, ThumbsUp, Plus, ShieldAlert, Navigation, Search, Smartphone, Globe, Sparkles, Route } from 'lucide-react';
 import { HazardReport, RouteSearchResult, UnitSystem } from '../types';
+import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 
 const API_KEY =
   process.env.GOOGLE_MAPS_PLATFORM_KEY ||
@@ -61,10 +62,45 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
 
   useEffect(() => {
     fetchHazards();
+
+    if (isSupabaseConfigured && supabase) {
+      const channel = supabase
+        .channel('public_road_hazards_channel')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'road_hazards' }, () => {
+          fetchHazards();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
   }, []);
 
   const fetchHazards = async () => {
     try {
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase
+          .from('road_hazards')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          const parsedHazards: HazardReport[] = data.map(item => ({
+            id: item.id,
+            hazard_type: item.hazard_type as HazardReport['hazard_type'],
+            description: item.description,
+            lat: Number(item.lat),
+            lng: Number(item.lng),
+            upvotes: Number(item.upvotes) || 1,
+            time: 'Recently reported',
+            source_app: item.source_app || 'WEB_APP'
+          }));
+          setHazards(parsedHazards);
+          return;
+        }
+      }
+
       if (window.DriveSafeBackend) {
         const backend = typeof window.DriveSafeBackend === 'function' && window.DriveSafeBackend.getHazardReports
           ? window.DriveSafeBackend
@@ -89,7 +125,7 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
     const newReport: HazardReport = {
       id: `haz_${Date.now()}`,
       hazard_type: newHazardType,
-      description,
+      description: description.trim(),
       lat: 37.7749 + (Math.random() - 0.5) * 0.04,
       lng: -122.4194 + (Math.random() - 0.5) * 0.04,
       upvotes: 1,
@@ -100,6 +136,18 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
     setHazards(prev => [newReport, ...prev]);
 
     try {
+      if (isSupabaseConfigured && supabase) {
+        await supabase.from('road_hazards').insert({
+          id: newReport.id,
+          hazard_type: newReport.hazard_type,
+          description: newReport.description,
+          lat: newReport.lat,
+          lng: newReport.lng,
+          upvotes: 1,
+          source_app: newReport.source_app
+        });
+      }
+
       if (window.DriveSafeBackend) {
         const backend = typeof window.DriveSafeBackend === 'function' && window.DriveSafeBackend.addHazardReport
           ? window.DriveSafeBackend
@@ -123,8 +171,17 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
     setShowModal(false);
   };
 
-  const handleUpvote = (id: string) => {
-    setHazards(prev => prev.map(h => h.id === id ? { ...h, upvotes: h.upvotes + 1 } : h));
+  const handleUpvote = async (id: string) => {
+    setHazards(prev => prev.map(h => {
+      if (h.id === id) {
+        const updatedUpvotes = h.upvotes + 1;
+        if (isSupabaseConfigured && supabase) {
+          supabase.from('road_hazards').update({ upvotes: updatedUpvotes }).eq('id', id).then();
+        }
+        return { ...h, upvotes: updatedUpvotes };
+      }
+      return h;
+    }));
   };
 
   const handleSearchSafeRoute = (e: React.FormEvent) => {

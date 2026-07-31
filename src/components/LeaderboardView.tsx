@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Trophy, Medal, Award, Star, UserCheck, Plus, User, ShieldCheck } from 'lucide-react';
-import { getAllAccounts, getActiveUsername, UserAccount } from '../lib/accountManager';
+import { fetchAllAccountsFromSupabase, getAllAccounts, getActiveUsername, UserAccount } from '../lib/accountManager';
 
 interface LeaderboardViewProps {
   onOpenLoginModal?: () => void;
@@ -14,8 +14,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onOpenLoginMod
     loadAccounts();
   }, [activeUsername]);
 
-  const loadAccounts = () => {
-    const list = getAllAccounts();
+  const loadAccounts = async () => {
+    const list = await fetchAllAccountsFromSupabase();
     // Sort accounts by safetyScore descending, then totalTrips descending
     list.sort((a, b) => {
       if (b.safetyScore !== a.safetyScore) return b.safetyScore - a.safetyScore;
@@ -49,7 +49,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onOpenLoginMod
               <h2 className="text-xl font-bold text-white font-display">Registered Driver Leaderboard</h2>
             </div>
             <p className="text-sm text-slate-300 max-w-2xl">
-              Ranks accounts created on this device based on real logged trip safety scores, clean driving records, and accumulated points.
+              Ranks registered drivers based on real logged trip safety scores, clean driving records, and accumulated points across all devices in real-time.
             </p>
           </div>
 

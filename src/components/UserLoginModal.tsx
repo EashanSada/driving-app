@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, ShieldAlert, ArrowRight, CheckCircle2, Trophy, Phone, Mail, Users, ArrowLeft, Loader2 } from 'lucide-react';
-import { accountExists, createAccount, fetchAccountFromSupabase, getAccount, getAllAccounts, setActiveUsername, UserAccount } from '../lib/accountManager';
+import { accountExists, createAccountAsync, fetchAccountFromSupabase, getAccount, getAllAccounts, setActiveUsername, UserAccount } from '../lib/accountManager';
 
 interface UserLoginModalProps {
   isOpen: boolean;
@@ -75,7 +75,7 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
     }
   };
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim()) {
       setErrorMsg('Please enter your full name.');
@@ -102,18 +102,28 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
       return;
     }
 
-    const newAcc = createAccount({
-      username: usernameInput.trim(),
-      fullName: fullName.trim(),
-      phone: phone.trim(),
-      email: email.trim(),
-      parentName: parentName.trim(),
-      parentPhone: parentPhone.trim(),
-      parentEmail: parentEmail.trim()
-    });
+    setIsSubmitting(true);
+    setErrorMsg('');
 
-    onLoginSuccess(newAcc.username);
-    resetModalState();
+    try {
+      const newAcc = await createAccountAsync({
+        username: usernameInput.trim(),
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
+        parentName: parentName.trim(),
+        parentPhone: parentPhone.trim(),
+        parentEmail: parentEmail.trim()
+      });
+
+      onLoginSuccess(newAcc.username);
+      resetModalState();
+    } catch (err) {
+      console.error('Registration failed:', err);
+      setErrorMsg('Failed to create account. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSelectExisting = (acc: UserAccount) => {

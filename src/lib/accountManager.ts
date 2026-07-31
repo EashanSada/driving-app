@@ -128,15 +128,15 @@ export function createAccount(data: {
 }
 
 export async function fetchAccountFromSupabase(username: string): Promise<UserAccount | null> {
-  const cleanName = username.trim().toLowerCase();
+  const cleanName = username.trim();
   if (!cleanName || !isSupabaseConfigured || !supabase) return null;
 
   try {
-    // Try primary driver_accounts table
+    // Case-insensitive query on driver_accounts
     const { data, error } = await supabase
       .from('driver_accounts')
       .select('*')
-      .eq('username', cleanName)
+      .ilike('username', cleanName)
       .maybeSingle();
 
     if (!error && data) {
@@ -149,21 +149,21 @@ export async function fetchAccountFromSupabase(username: string): Promise<UserAc
         parentPhone: data.parent_phone || '',
         parentEmail: data.parent_email || '',
         createdTime: data.created_time || Date.now(),
-        safetyScore: data.safety_score ?? 100,
-        cleanTrips: data.clean_trips ?? 0,
-        totalTrips: data.total_trips ?? 0,
-        totalDistanceMiles: data.total_distance_miles ?? 0,
-        points: data.points ?? 0,
-        level: data.level ?? 1,
-        currentXp: data.current_xp ?? 0,
-        nextLevelXp: data.next_level_xp ?? 1000,
-        badgesUnlocked: data.badges_unlocked || [],
+        safetyScore: Number(data.safety_score) || 100,
+        cleanTrips: Number(data.clean_trips) || 0,
+        totalTrips: Number(data.total_trips) || 0,
+        totalDistanceMiles: Number(data.total_distance_miles) || 0,
+        points: Number(data.points) || 0,
+        level: Number(data.level) || 1,
+        currentXp: Number(data.current_xp) || 0,
+        nextLevelXp: Number(data.next_level_xp) || 1000,
+        badgesUnlocked: data.badges_unlocked || ['BRONZE_GUARDIAN'],
         tripHistory: data.trip_history || []
       };
 
-      // Save locally
+      // Save to local cache
       const allMap = getAccountsMap();
-      allMap[cleanName] = parsedAccount;
+      allMap[parsedAccount.username.toLowerCase()] = parsedAccount;
       localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(allMap));
       return parsedAccount;
     }
@@ -174,6 +174,55 @@ export async function fetchAccountFromSupabase(username: string): Promise<UserAc
   return null;
 }
 
+export async function fetchAllAccountsFromSupabase(): Promise<UserAccount[]> {
+  const localAccounts = getAllAccounts();
+  if (!isSupabaseConfigured || !supabase) return localAccounts;
+
+  try {
+    const { data, error } = await supabase
+      .from('driver_accounts')
+      .select('*')
+      .order('safety_score', { ascending: false });
+
+    if (!error && data && data.length > 0) {
+      const accountsMap = getAccountsMap();
+      
+      const cloudAccounts: UserAccount[] = data.map(item => {
+        const acc: UserAccount = item.account_data || {
+          username: item.username,
+          fullName: item.full_name || item.username,
+          phone: item.phone || '',
+          email: item.email || '',
+          parentName: item.parent_name || '',
+          parentPhone: item.parent_phone || '',
+          parentEmail: item.parent_email || '',
+          createdTime: item.created_time || Date.now(),
+          safetyScore: Number(item.safety_score) || 100,
+          cleanTrips: Number(item.clean_trips) || 0,
+          totalTrips: Number(item.total_trips) || 0,
+          totalDistanceMiles: Number(item.total_distance_miles) || 0,
+          points: Number(item.points) || 0,
+          level: Number(item.level) || 1,
+          currentXp: Number(item.current_xp) || 0,
+          nextLevelXp: Number(item.next_level_xp) || 1000,
+          badgesUnlocked: item.badges_unlocked || ['BRONZE_GUARDIAN'],
+          tripHistory: item.trip_history || []
+        };
+
+        accountsMap[acc.username.toLowerCase()] = acc;
+        return acc;
+      });
+
+      localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(accountsMap));
+      return cloudAccounts;
+    }
+  } catch (err) {
+    console.warn('Fetch all accounts notice:', err);
+  }
+
+  return localAccounts;
+}
+
 export function saveAccount(account: UserAccount): void {
   try {
     const cleanKey = account.username.toLowerCase();
@@ -182,37 +231,90 @@ export function saveAccount(account: UserAccount): void {
     localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(allMap));
 
     if (isSupabaseConfigured && supabase) {
-      // Sync to Supabase driver_accounts
-      supabase.from('driver_accounts').upsert({
-        username: cleanKey,
-        full_name: account.fullName,
-        phone: account.phone || '',
-        email: account.email || '',
-        parent_name: account.parentName || '',
-        parent_phone: account.parentPhone || '',
-        parent_email: account.parentEmail || '',
-        safety_score: account.safetyScore,
-        clean_trips: account.cleanTrips,
-        total_trips: account.totalTrips,
-        total_distance_miles: account.totalDistanceMiles,
-        points: account.points,
-        level: account.level,
-        current_xp: account.currentXp,
-        next_level_xp: account.nextLevelXp,
-        badges_unlocked: account.badgesUnlocked,
-        trip_history: account.tripHistory,
-        account_data: account,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'username' }).then(({ error }) => {
-        if (error) {
-          console.warn('Supabase driver_accounts sync notice:', error.message);
-        }
-      });
+      saveAccountAsync(account).catch(err => console.warn('Background save warning:', err));
     }
   } catch (err) {
     console.error('Failed to save account:', err);
   }
 }
+
+export async function saveAccountAsync(account: UserAccount): Promise<void> {
+  const cleanKey = account.username.toLowerCase();
+  
+  if (!isSupabaseConfigured || !supabase) return;
+
+  try {
+    const payload = {
+      username: cleanKey,
+      full_name: account.fullName,
+      phone: account.phone || '',
+      email: account.email || '',
+      parent_name: account.parentName || '',
+      parent_phone: account.parentPhone || '',
+      parent_email: account.parentEmail || '',
+      safety_score: account.safetyScore,
+      clean_trips: account.cleanTrips,
+      total_trips: account.totalTrips,
+      total_distance_miles: account.totalDistanceMiles,
+      points: account.points,
+      level: account.level,
+      current_xp: account.currentXp,
+      next_level_xp: account.nextLevelXp,
+      badges_unlocked: account.badgesUnlocked,
+      trip_history: account.tripHistory,
+      account_data: account,
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+      .from('driver_accounts')
+      .upsert(payload, { onConflict: 'username' });
+
+    if (error) {
+      console.warn('Supabase driver_accounts upsert notice:', error.message);
+    }
+  } catch (err) {
+    console.error('saveAccountAsync error:', err);
+  }
+}
+
+export async function createAccountAsync(data: {
+  username: string;
+  fullName: string;
+  phone: string;
+  email: string;
+  parentName: string;
+  parentPhone: string;
+  parentEmail: string;
+}): Promise<UserAccount> {
+  const cleanName = data.username.trim();
+  const newAccount: UserAccount = {
+    username: cleanName,
+    fullName: data.fullName.trim() || cleanName,
+    phone: data.phone.trim(),
+    email: data.email.trim(),
+    parentName: data.parentName.trim(),
+    parentPhone: data.parentPhone.trim(),
+    parentEmail: data.parentEmail.trim(),
+    createdTime: Date.now(),
+    safetyScore: 100,
+    cleanTrips: 0,
+    totalTrips: 0,
+    totalDistanceMiles: 0,
+    points: 0,
+    level: 1,
+    currentXp: 0,
+    nextLevelXp: 1000,
+    badgesUnlocked: ['BRONZE_GUARDIAN'],
+    tripHistory: []
+  };
+
+  saveAccount(newAccount);
+  await saveAccountAsync(newAccount);
+  setActiveUsername(cleanName);
+  return newAccount;
+}
+
 
 export function logoutActiveUser(): void {
   try {
