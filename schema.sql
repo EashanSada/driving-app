@@ -51,6 +51,9 @@ CREATE POLICY "Allow public update driver_accounts" ON public.driver_accounts FO
 DROP POLICY IF EXISTS "Allow public delete driver_accounts" ON public.driver_accounts;
 CREATE POLICY "Allow public delete driver_accounts" ON public.driver_accounts FOR DELETE USING (true);
 
+GRANT USAGE ON SCHEMA public TO anon, authenticated, postgres, service_role;
+GRANT ALL ON public.driver_accounts TO anon, authenticated, postgres, service_role;
+
 -- 2C. REAL-TIME ROAD HAZARDS TABLE (Cross-Device Live Hazard Reports)
 CREATE TABLE IF NOT EXISTS public.road_hazards (
     id TEXT PRIMARY KEY,
@@ -77,6 +80,8 @@ CREATE POLICY "Allow public update road_hazards" ON public.road_hazards FOR UPDA
 
 DROP POLICY IF EXISTS "Allow public delete road_hazards" ON public.road_hazards;
 CREATE POLICY "Allow public delete road_hazards" ON public.road_hazards FOR DELETE USING (true);
+
+GRANT ALL ON public.road_hazards TO anon, authenticated, postgres, service_role;
 
 
 -- 3. PROFILES TABLE (Syncs with Supabase Auth auth.users)

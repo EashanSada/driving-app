@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
-import { User, ShieldAlert, ArrowRight, CheckCircle2, Trophy, Phone, Mail, Users, ArrowLeft, Loader2, Database } from 'lucide-react';
+import { User, ShieldAlert, ArrowRight, CheckCircle2, Trophy, Phone, Mail, Users, ArrowLeft, Loader2 } from 'lucide-react';
 import { accountExists, createAccountAsync, fetchAccountFromSupabase, getAccount, getAllAccounts, setActiveUsername, UserAccount } from '../lib/accountManager';
-import { isSupabaseConfigured } from '../lib/supabaseClient';
-import { CloudDatabaseModal } from './CloudDatabaseModal';
 
 interface UserLoginModalProps {
   isOpen: boolean;
@@ -21,7 +19,6 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
   const [usernameInput, setUsernameInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showDbModal, setShowDbModal] = useState(false);
 
   // Registration Form State
   const [fullName, setFullName] = useState('');
@@ -402,26 +399,6 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
             </form>
           )}
 
-          {/* Cloud Database Sync Status Bar */}
-          <div className="mt-5 pt-3 border-t border-white/10 flex items-center justify-between text-xs">
-            <button
-              type="button"
-              onClick={() => setShowDbModal(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 transition-all cursor-pointer w-full justify-between"
-            >
-              <div className="flex items-center gap-2">
-                <Database className="w-3.5 h-3.5 text-[#2dd4bf]" />
-                <span className="text-[11px] font-medium">Cloud DB Sync Status:</span>
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                  isSupabaseConfigured() ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-                }`}>
-                  {isSupabaseConfigured() ? 'Connected' : 'Setup Required'}
-                </span>
-              </div>
-              <span className="text-[11px] text-[#2dd4bf] underline">Configure</span>
-            </button>
-          </div>
-
           {allowCancel && onClose && (
             <button
               type="button"
@@ -436,9 +413,6 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
           )}
         </div>
       </div>
-
-      {/* Cloud Database Configuration Modal */}
-      <CloudDatabaseModal isOpen={showDbModal} onClose={() => setShowDbModal(false)} />
     </div>
   );
 };
