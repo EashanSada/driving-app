@@ -179,6 +179,26 @@ Trip Summary Data:
     }
   });
 
+  // 3. Accounts Cloud Persistence Endpoint
+  app.all("/api/accounts", async (req, res) => {
+    try {
+      const accountsHandler = (await import("./api/accounts")).default;
+      return accountsHandler(req, res);
+    } catch (err: any) {
+      res.status(500).json({ status: "error", message: err.message });
+    }
+  });
+
+  // 4. Hazards Live Cross-Device Endpoint
+  app.all("/api/hazards", async (req, res) => {
+    try {
+      const hazardsHandler = (await import("./api/hazards")).default;
+      return hazardsHandler(req, res);
+    } catch (err: any) {
+      res.status(500).json({ status: "error", message: err.message });
+    }
+  });
+
   // Serve Vite in Development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

@@ -131,60 +131,75 @@ export async function fetchAccountFromSupabase(username: string): Promise<UserAc
   const cleanName = username.trim();
   if (!cleanName) return null;
 
-  const client = getSupabaseClient();
-  if (!client) return null;
-
+  // 1. First try Backend Server Cloud Endpoint for seamless multi-device sync
   try {
-    const cleanLower = cleanName.toLowerCase();
-    
-    // First try exact lowercase match
-    let { data, error } = await client
-      .from('driver_accounts')
-      .select('*')
-      .eq('username', cleanLower)
-      .maybeSingle();
-
-    // If not found, try case-insensitive ilike match
-    if (!data) {
-      const res = await client
-        .from('driver_accounts')
-        .select('*')
-        .ilike('username', cleanName)
-        .maybeSingle();
-      data = res.data;
-      error = res.error;
-    }
-
-    if (!error && data) {
-      const parsedAccount: UserAccount = data.account_data || {
-        username: data.username || cleanName,
-        fullName: data.full_name || cleanName,
-        phone: data.phone || '',
-        email: data.email || '',
-        parentName: data.parent_name || '',
-        parentPhone: data.parent_phone || '',
-        parentEmail: data.parent_email || '',
-        createdTime: data.created_time || Date.now(),
-        safetyScore: Number(data.safety_score) || 100,
-        cleanTrips: Number(data.clean_trips) || 0,
-        totalTrips: Number(data.total_trips) || 0,
-        totalDistanceMiles: Number(data.total_distance_miles) || 0,
-        points: Number(data.points) || 0,
-        level: Number(data.level) || 1,
-        currentXp: Number(data.current_xp) || 0,
-        nextLevelXp: Number(data.next_level_xp) || 1000,
-        badgesUnlocked: data.badges_unlocked || ['BRONZE_GUARDIAN'],
-        tripHistory: data.trip_history || []
-      };
-
-      // Save to local cache
-      const allMap = getAccountsMap();
-      allMap[parsedAccount.username.toLowerCase()] = parsedAccount;
-      localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(allMap));
-      return parsedAccount;
+    const res = await fetch(`/api/accounts?username=${encodeURIComponent(cleanName)}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.status === 'success' && json.account) {
+        const acc: UserAccount = json.account;
+        const allMap = getAccountsMap();
+        allMap[acc.username.toLowerCase()] = acc;
+        localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(allMap));
+        return acc;
+      }
     }
   } catch (err) {
-    console.warn('Supabase account fetch notice:', err);
+    console.warn('Backend server account query notice:', err);
+  }
+
+  // 2. Secondary: Direct Supabase Client Query
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const cleanLower = cleanName.toLowerCase();
+      
+      let { data, error } = await client
+        .from('driver_accounts')
+        .select('*')
+        .eq('username', cleanLower)
+        .maybeSingle();
+
+      if (!data) {
+        const res = await client
+          .from('driver_accounts')
+          .select('*')
+          .ilike('username', cleanName)
+          .maybeSingle();
+        data = res.data;
+        error = res.error;
+      }
+
+      if (!error && data) {
+        const parsedAccount: UserAccount = data.account_data || {
+          username: data.username || cleanName,
+          fullName: data.full_name || cleanName,
+          phone: data.phone || '',
+          email: data.email || '',
+          parentName: data.parent_name || '',
+          parentPhone: data.parent_phone || '',
+          parentEmail: data.parent_email || '',
+          createdTime: data.created_time || Date.now(),
+          safetyScore: Number(data.safety_score) || 100,
+          cleanTrips: Number(data.clean_trips) || 0,
+          totalTrips: Number(data.total_trips) || 0,
+          totalDistanceMiles: Number(data.total_distance_miles) || 0,
+          points: Number(data.points) || 0,
+          level: Number(data.level) || 1,
+          currentXp: Number(data.current_xp) || 0,
+          nextLevelXp: Number(data.next_level_xp) || 1000,
+          badgesUnlocked: data.badges_unlocked || ['BRONZE_GUARDIAN'],
+          tripHistory: data.trip_history || []
+        };
+
+        const allMap = getAccountsMap();
+        allMap[parsedAccount.username.toLowerCase()] = parsedAccount;
+        localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(allMap));
+        return parsedAccount;
+      }
+    } catch (err) {
+      console.warn('Supabase account fetch notice:', err);
+    }
   }
 
   return null;
@@ -192,49 +207,71 @@ export async function fetchAccountFromSupabase(username: string): Promise<UserAc
 
 export async function fetchAllAccountsFromSupabase(): Promise<UserAccount[]> {
   const localAccounts = getAllAccounts();
-  const client = getSupabaseClient();
-  if (!client) return localAccounts;
 
+  // 1. Try Server API Endpoint
   try {
-    const { data, error } = await client
-      .from('driver_accounts')
-      .select('*')
-      .order('safety_score', { ascending: false });
-
-    if (!error && data && data.length > 0) {
-      const accountsMap = getAccountsMap();
-      
-      const cloudAccounts: UserAccount[] = data.map(item => {
-        const acc: UserAccount = item.account_data || {
-          username: item.username,
-          fullName: item.full_name || item.username,
-          phone: item.phone || '',
-          email: item.email || '',
-          parentName: item.parent_name || '',
-          parentPhone: item.parent_phone || '',
-          parentEmail: item.parent_email || '',
-          createdTime: item.created_time || Date.now(),
-          safetyScore: Number(item.safety_score) || 100,
-          cleanTrips: Number(item.clean_trips) || 0,
-          totalTrips: Number(item.total_trips) || 0,
-          totalDistanceMiles: Number(item.total_distance_miles) || 0,
-          points: Number(item.points) || 0,
-          level: Number(item.level) || 1,
-          currentXp: Number(item.current_xp) || 0,
-          nextLevelXp: Number(item.next_level_xp) || 1000,
-          badgesUnlocked: item.badges_unlocked || ['BRONZE_GUARDIAN'],
-          tripHistory: item.trip_history || []
-        };
-
-        accountsMap[acc.username.toLowerCase()] = acc;
-        return acc;
-      });
-
-      localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(accountsMap));
-      return cloudAccounts;
+    const res = await fetch('/api/accounts');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.status === 'success' && Array.isArray(json.accounts) && json.accounts.length > 0) {
+        const accountsMap = getAccountsMap();
+        json.accounts.forEach((acc: UserAccount) => {
+          if (acc.username) {
+            accountsMap[acc.username.toLowerCase()] = acc;
+          }
+        });
+        localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(accountsMap));
+        return json.accounts;
+      }
     }
   } catch (err) {
-    console.warn('Fetch all accounts notice:', err);
+    console.warn('Fetch server accounts notice:', err);
+  }
+
+  // 2. Direct Supabase Client
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const { data, error } = await client
+        .from('driver_accounts')
+        .select('*')
+        .order('safety_score', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        const accountsMap = getAccountsMap();
+        
+        const cloudAccounts: UserAccount[] = data.map(item => {
+          const acc: UserAccount = item.account_data || {
+            username: item.username,
+            fullName: item.full_name || item.username,
+            phone: item.phone || '',
+            email: item.email || '',
+            parentName: item.parent_name || '',
+            parentPhone: item.parent_phone || '',
+            parentEmail: item.parent_email || '',
+            createdTime: item.created_time || Date.now(),
+            safetyScore: Number(item.safety_score) || 100,
+            cleanTrips: Number(item.clean_trips) || 0,
+            totalTrips: Number(item.total_trips) || 0,
+            totalDistanceMiles: Number(item.total_distance_miles) || 0,
+            points: Number(item.points) || 0,
+            level: Number(item.level) || 1,
+            currentXp: Number(item.current_xp) || 0,
+            nextLevelXp: Number(item.next_level_xp) || 1000,
+            badgesUnlocked: item.badges_unlocked || ['BRONZE_GUARDIAN'],
+            tripHistory: item.trip_history || []
+          };
+
+          accountsMap[acc.username.toLowerCase()] = acc;
+          return acc;
+        });
+
+        localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(accountsMap));
+        return cloudAccounts;
+      }
+    } catch (err) {
+      console.warn('Fetch all accounts notice:', err);
+    }
   }
 
   return localAccounts;
@@ -247,9 +284,8 @@ export function saveAccount(account: UserAccount): void {
     allMap[cleanKey] = account;
     localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(allMap));
 
-    if (getSupabaseClient()) {
-      saveAccountAsync(account).catch(err => console.warn('Background save warning:', err));
-    }
+    // Save to Cloud Server & Supabase asynchronously
+    saveAccountAsync(account).catch(err => console.warn('Background account sync warning:', err));
   } catch (err) {
     console.error('Failed to save account:', err);
   }
@@ -257,42 +293,48 @@ export function saveAccount(account: UserAccount): void {
 
 export async function saveAccountAsync(account: UserAccount): Promise<void> {
   const cleanKey = account.username.toLowerCase();
-  const client = getSupabaseClient();
-  
-  if (!client) return;
 
+  // 1. Post to Server Cloud API (syncs across devices)
   try {
-    const payload = {
-      username: cleanKey,
-      full_name: account.fullName,
-      phone: account.phone || '',
-      email: account.email || '',
-      parent_name: account.parentName || '',
-      parent_phone: account.parentPhone || '',
-      parent_email: account.parentEmail || '',
-      safety_score: account.safetyScore,
-      clean_trips: account.cleanTrips,
-      total_trips: account.totalTrips,
-      total_distance_miles: account.totalDistanceMiles,
-      points: account.points,
-      level: account.level,
-      current_xp: account.currentXp,
-      next_level_xp: account.nextLevelXp,
-      badges_unlocked: account.badgesUnlocked,
-      trip_history: account.tripHistory,
-      account_data: account,
-      updated_at: new Date().toISOString()
-    };
-
-    const { error } = await client
-      .from('driver_accounts')
-      .upsert(payload, { onConflict: 'username' });
-
-    if (error) {
-      console.warn('Supabase driver_accounts upsert notice:', error.message);
-    }
+    await fetch('/api/accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(account)
+    });
   } catch (err) {
-    console.error('saveAccountAsync error:', err);
+    console.warn('Server API account sync notice:', err);
+  }
+
+  // 2. Post to Supabase if configured
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const payload = {
+        username: cleanKey,
+        full_name: account.fullName,
+        phone: account.phone || '',
+        email: account.email || '',
+        parent_name: account.parentName || '',
+        parent_phone: account.parentPhone || '',
+        parent_email: account.parentEmail || '',
+        safety_score: account.safetyScore,
+        clean_trips: account.cleanTrips,
+        total_trips: account.totalTrips,
+        total_distance_miles: account.totalDistanceMiles,
+        points: account.points,
+        level: account.level,
+        current_xp: account.currentXp,
+        next_level_xp: account.nextLevelXp,
+        badges_unlocked: account.badgesUnlocked,
+        trip_history: account.tripHistory,
+        account_data: account,
+        updated_at: new Date().toISOString()
+      };
+
+      await client.from('driver_accounts').upsert(payload, { onConflict: 'username' });
+    } catch (err) {
+      console.warn('Supabase driver_accounts upsert notice:', err);
+    }
   }
 }
 

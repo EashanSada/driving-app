@@ -80,6 +80,17 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
 
   const fetchHazards = async () => {
     try {
+      // 1. Fetch from Server Cloud API
+      const res = await fetch('/api/hazards');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.status === 'success' && Array.isArray(json.hazards) && json.hazards.length > 0) {
+          setHazards(json.hazards);
+          return;
+        }
+      }
+
+      // 2. Fetch from Supabase
       const client = getSupabaseClient();
       if (client) {
         const { data, error } = await client
@@ -138,6 +149,14 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
     setHazards(prev => [newReport, ...prev]);
 
     try {
+      // 1. Post to Server Cloud API
+      await fetch('/api/hazards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newReport)
+      });
+
+      // 2. Post to Supabase
       const client = getSupabaseClient();
       if (client) {
         await client.from('road_hazards').insert({
@@ -178,6 +197,12 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
     setHazards(prev => prev.map(h => {
       if (h.id === id) {
         const updatedUpvotes = h.upvotes + 1;
+        fetch('/api/hazards', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        }).catch();
+
         const client = getSupabaseClient();
         if (client) {
           client.from('road_hazards').update({ upvotes: updatedUpvotes }).eq('id', id).then();

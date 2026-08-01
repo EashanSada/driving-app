@@ -12,6 +12,14 @@
       "destination": "/api/ai-coach.ts"
     },
     {
+      "source": "/api/accounts",
+      "destination": "/api/accounts.ts"
+    },
+    {
+      "source": "/api/hazards",
+      "destination": "/api/hazards.ts"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
