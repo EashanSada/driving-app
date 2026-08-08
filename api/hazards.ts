@@ -1,17 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
 
-const inMemoryHazards: any[] = [];
+function getSupabaseServerClient(req?: any) {
+  const headerUrl = req?.headers?.['x-supabase-url'] || req?.headers?.['authorization-url'];
+  const headerKey = req?.headers?.['x-supabase-key'] || req?.headers?.['authorization-key'];
 
-function getSupabaseServerClient() {
   const url =
+    (typeof headerUrl === 'string' && headerUrl.trim()) ||
     process.env.VITE_SUPABASE_URL ||
     process.env.SUPABASE_URL ||
     process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.REACT_APP_SUPABASE_URL ||
     '';
+
   const key =
+    (typeof headerKey === 'string' && headerKey.trim()) ||
     process.env.VITE_SUPABASE_ANON_KEY ||
     process.env.SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.REACT_APP_SUPABASE_ANON_KEY ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     '';
 
@@ -28,41 +34,44 @@ function getSupabaseServerClient() {
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-supabase-url, x-supabase-key');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabaseServerClient(req);
 
   if (req.method === 'GET') {
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('road_hazards')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (!error && data && data.length > 0) {
-          const hazards = data.map((item: any) => ({
-            id: item.id,
-            hazard_type: item.hazard_type,
-            description: item.description,
-            lat: Number(item.lat),
-            lng: Number(item.lng),
-            upvotes: Number(item.upvotes) || 1,
-            time: 'Recently reported',
-            source_app: item.source_app || 'WEB_APP'
-          }));
-          return res.status(200).json({ status: 'success', hazards });
-        }
-      } catch (err) {
-        console.warn('Server Supabase fetch hazards error:', err);
-      }
+    if (!supabase) {
+      return res.status(200).json({ status: 'success', hazards: [], source: 'unconfigured' });
     }
 
-    return res.status(200).json({ status: 'success', hazards: inMemoryHazards });
+    try {
+      const { data, error } = await supabase
+        .from('road_hazards')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        return res.status(500).json({ status: 'error', message: error.message });
+      }
+
+      const hazards = (data || []).map((item: any) => ({
+        id: item.id,
+        hazard_type: item.hazard_type,
+        description: item.description,
+        lat: Number(item.lat),
+        lng: Number(item.lng),
+        upvotes: Number(item.upvotes) || 1,
+        time: 'Recently reported',
+        source_app: item.source_app || 'WEB_APP'
+      }));
+
+      return res.status(200).json({ status: 'success', hazards, source: 'supabase' });
+    } catch (err: any) {
+      return res.status(500).json({ status: 'error', message: err.message || 'Failed to fetch hazards' });
+    }
   }
 
   if (req.method === 'POST') {
@@ -71,47 +80,52 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ status: 'error', message: 'Invalid hazard payload' });
     }
 
-    inMemoryHazards.unshift(report);
-
-    if (supabase) {
-      try {
-        await supabase.from('road_hazards').insert({
-          id: report.id,
-          hazard_type: report.hazard_type,
-          description: report.description,
-          lat: Number(report.lat),
-          lng: Number(report.lng),
-          upvotes: Number(report.upvotes) || 1,
-          source_app: report.source_app || 'WEB_APP'
-        });
-      } catch (err) {
-        console.warn('Server Supabase insert hazard warning:', err);
-      }
+    if (!supabase) {
+      return res.status(503).json({ status: 'error', supabaseSaved: false, message: 'Supabase client not initialized' });
     }
 
-    return res.status(200).json({ status: 'success', report });
+    try {
+      const { error } = await supabase.from('road_hazards').insert({
+        id: report.id,
+        hazard_type: report.hazard_type,
+        description: report.description,
+        lat: Number(report.lat),
+        lng: Number(report.lng),
+        upvotes: Number(report.upvotes) || 1,
+        source_app: report.source_app || 'WEB_APP'
+      });
+
+      if (error) {
+        return res.status(500).json({ status: 'error', supabaseSaved: false, message: error.message });
+      }
+
+      return res.status(200).json({ status: 'success', report, supabaseSaved: true });
+    } catch (err: any) {
+      return res.status(500).json({ status: 'error', supabaseSaved: false, message: err.message });
+    }
   }
 
   if (req.method === 'PUT') {
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ status: 'error', message: 'ID required' });
 
-    const item = inMemoryHazards.find(h => h.id === id);
-    if (item) {
-      item.upvotes = (item.upvotes || 1) + 1;
+    if (!supabase) {
+      return res.status(503).json({ status: 'error', message: 'Supabase client not initialized' });
     }
 
-    if (supabase) {
-      try {
-        if (item) {
-          await supabase.from('road_hazards').update({ upvotes: item.upvotes }).eq('id', id);
-        }
-      } catch (err) {
-        console.warn('Server Supabase update hazard upvotes warning:', err);
+    try {
+      const { data: existing } = await supabase.from('road_hazards').select('upvotes').eq('id', id).single();
+      const currentUpvotes = existing ? (existing.upvotes || 1) + 1 : 2;
+
+      const { error } = await supabase.from('road_hazards').update({ upvotes: currentUpvotes }).eq('id', id);
+      if (error) {
+        return res.status(500).json({ status: 'error', message: error.message });
       }
-    }
 
-    return res.status(200).json({ status: 'success', id });
+      return res.status(200).json({ status: 'success', id, upvotes: currentUpvotes });
+    } catch (err: any) {
+      return res.status(500).json({ status: 'error', message: err.message });
+    }
   }
 
   return res.status(405).json({ status: 'error', message: 'Method not allowed' });

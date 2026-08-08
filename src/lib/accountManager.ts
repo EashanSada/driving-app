@@ -1,5 +1,5 @@
 import { UnitSystem } from '../types';
-import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient';
+import { getSupabaseClient, getSupabaseUrl, getSupabaseAnonKey, isSupabaseConfigured } from './supabaseClient';
 
 export interface TripRecord {
   id: string;
@@ -133,7 +133,13 @@ export async function fetchAccountFromSupabase(username: string): Promise<UserAc
 
   // 1. First try Backend Server Cloud Endpoint for seamless multi-device sync
   try {
-    const res = await fetch(`/api/accounts?username=${encodeURIComponent(cleanName)}`);
+    const headers: Record<string, string> = {};
+    const clientUrl = getSupabaseUrl();
+    const clientKey = getSupabaseAnonKey();
+    if (clientUrl) headers['x-supabase-url'] = clientUrl;
+    if (clientKey) headers['x-supabase-key'] = clientKey;
+
+    const res = await fetch(`/api/accounts?username=${encodeURIComponent(cleanName)}`, { headers });
     if (res.ok) {
       const json = await res.json();
       if (json.status === 'success' && json.account) {
@@ -210,7 +216,13 @@ export async function fetchAllAccountsFromSupabase(): Promise<UserAccount[]> {
 
   // 1. Try Server API Endpoint
   try {
-    const res = await fetch('/api/accounts');
+    const headers: Record<string, string> = {};
+    const clientUrl = getSupabaseUrl();
+    const clientKey = getSupabaseAnonKey();
+    if (clientUrl) headers['x-supabase-url'] = clientUrl;
+    if (clientKey) headers['x-supabase-key'] = clientKey;
+
+    const res = await fetch('/api/accounts', { headers });
     if (res.ok) {
       const json = await res.json();
       if (json.status === 'success' && Array.isArray(json.accounts) && json.accounts.length > 0) {
@@ -291,21 +303,38 @@ export function saveAccount(account: UserAccount): void {
   }
 }
 
-export async function saveAccountAsync(account: UserAccount): Promise<void> {
+export async function saveAccountAsync(account: UserAccount): Promise<{ success: boolean; message?: string }> {
   const cleanKey = account.username.toLowerCase();
+  let serverSaved = false;
+  let serverError = '';
 
   // 1. Post to Server Cloud API (syncs across devices)
   try {
-    await fetch('/api/accounts', {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const clientUrl = getSupabaseUrl();
+    const clientKey = getSupabaseAnonKey();
+    if (clientUrl) headers['x-supabase-url'] = clientUrl;
+    if (clientKey) headers['x-supabase-key'] = clientKey;
+
+    const res = await fetch('/api/accounts', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(account)
     });
-  } catch (err) {
+
+    const json = await res.json();
+    if (res.ok && json.supabaseSaved) {
+      serverSaved = true;
+    } else {
+      serverError = json.supabaseError || json.message || `Server returned status ${res.status}`;
+      console.warn('Server API account sync notice:', serverError);
+    }
+  } catch (err: any) {
+    serverError = err.message || 'Network error sync';
     console.warn('Server API account sync notice:', err);
   }
 
-  // 2. Post to Supabase if configured
+  // 2. Post to Supabase direct client if configured
   const client = getSupabaseClient();
   if (client) {
     try {
@@ -331,11 +360,39 @@ export async function saveAccountAsync(account: UserAccount): Promise<void> {
         updated_at: new Date().toISOString()
       };
 
-      await client.from('driver_accounts').upsert(payload, { onConflict: 'username' });
-    } catch (err) {
-      console.warn('Supabase driver_accounts upsert notice:', err);
+      const { error: upsertErr } = await client.from('driver_accounts').upsert(payload, { onConflict: 'username' });
+      if (!upsertErr) {
+        return { success: true };
+      }
+
+      const { error: updateErr } = await client.from('driver_accounts').update(payload).eq('username', cleanKey);
+      if (!updateErr) {
+        return { success: true };
+      }
+
+      const { error: insertErr } = await client.from('driver_accounts').insert(payload);
+      if (!insertErr) {
+        return { success: true };
+      }
+
+      return {
+        success: false,
+        message: upsertErr.message || updateErr?.message || insertErr?.message || 'Failed to save to Supabase'
+      };
+    } catch (err: any) {
+      console.warn('Supabase driver_accounts save exception:', err);
+      return { success: false, message: err.message };
     }
   }
+
+  if (serverSaved) {
+    return { success: true };
+  }
+
+  return {
+    success: false,
+    message: serverError || 'Supabase credentials missing on server & client.'
+  };
 }
 
 export async function createAccountAsync(data: {
@@ -346,7 +403,7 @@ export async function createAccountAsync(data: {
   parentName: string;
   parentPhone: string;
   parentEmail: string;
-}): Promise<UserAccount> {
+}): Promise<{ account: UserAccount; syncResult: { success: boolean; message?: string } }> {
   const cleanName = data.username.trim();
   const newAccount: UserAccount = {
     username: cleanName,
@@ -370,9 +427,9 @@ export async function createAccountAsync(data: {
   };
 
   saveAccount(newAccount);
-  await saveAccountAsync(newAccount);
+  const syncResult = await saveAccountAsync(newAccount);
   setActiveUsername(cleanName);
-  return newAccount;
+  return { account: newAccount, syncResult };
 }
 
 

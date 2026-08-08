@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, Activity, BarChart3, Trophy, AlertTriangle, Smartphone, Award, User, LogOut } from 'lucide-react';
+import { ShieldAlert, Activity, BarChart3, Trophy, AlertTriangle, Smartphone, Award, User, LogOut, Database } from 'lucide-react';
 import { LanguageCode, NavTab, UnitSystem } from '../types';
 import { t } from '../translations';
 import { UserAccount } from '../lib/accountManager';
@@ -15,6 +15,7 @@ interface NavigationHeaderProps {
   activeUsername: string | null;
   activeAccount: UserAccount | null;
   onOpenLoginModal: () => void;
+  onOpenDbModal: () => void;
 }
 
 export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
@@ -27,7 +28,8 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
   hasNativeBridge,
   activeUsername,
   activeAccount,
-  onOpenLoginModal
+  onOpenLoginModal,
+  onOpenDbModal
 }) => {
   const languageNames: Record<LanguageCode, { label: string; flag: string }> = {
     en: { label: 'English', flag: '🇺🇸' },
@@ -139,6 +141,15 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
               );
             })}
           </div>
+
+          {/* Database Setup & Sync Status Button */}
+          <button
+            onClick={onOpenDbModal}
+            className="p-2 rounded-xl bg-[#020617]/70 border border-white/10 hover:border-[#2dd4bf]/40 text-slate-300 hover:text-[#2dd4bf] transition-all cursor-pointer flex items-center justify-center"
+            title="Database Status & Cloud Sync Settings"
+          >
+            <Database className="w-4 h-4 text-[#2dd4bf]" />
+          </button>
 
           {/* User Profile Badge / Switch Account */}
           <div className="flex items-center gap-2 pl-2 border-l border-white/10">

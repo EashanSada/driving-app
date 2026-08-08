@@ -7,6 +7,7 @@ import { GamificationView } from './components/GamificationView';
 import { HazardMapView } from './components/HazardMapView';
 import { UserLoginModal } from './components/UserLoginModal';
 import { UserProfileModal } from './components/UserProfileModal';
+import { DatabaseStatusModal } from './components/DatabaseStatusModal';
 import { LanguageCode, NavTab, UnitSystem } from './types';
 import { fetchAccountFromSupabase, getAccount, getActiveUsername, UserAccount } from './lib/accountManager';
 
@@ -22,6 +23,7 @@ export default function App() {
   const [activeAccount, setActiveAccount] = useState<UserAccount | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isDbModalOpen, setIsDbModalOpen] = useState(false);
 
   useEffect(() => {
     // Check if Native Android Bridge is present
@@ -108,6 +110,12 @@ export default function App() {
         onLogout={handleLogout}
       />
 
+      {/* Database Status Modal */}
+      <DatabaseStatusModal
+        isOpen={isDbModalOpen}
+        onClose={() => setIsDbModalOpen(false)}
+      />
+
       {/* Sticky Header */}
       <NavigationHeader
         activeTab={activeTab}
@@ -119,6 +127,7 @@ export default function App() {
         hasNativeBridge={hasNativeBridge}
         activeUsername={activeUsername}
         activeAccount={activeAccount}
+        onOpenDbModal={() => setIsDbModalOpen(true)}
         onOpenLoginModal={() => {
           if (activeUsername && activeAccount) {
             setIsProfileModalOpen(true);

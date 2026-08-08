@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useAdvancedMarkerRef } from '@vis.gl/react-google-maps';
 import { AlertTriangle, MapPin, ThumbsUp, Plus, ShieldAlert, Navigation, Search, Smartphone, Globe, Sparkles, Route } from 'lucide-react';
 import { HazardReport, RouteSearchResult, UnitSystem } from '../types';
-import { getSupabaseClient, isSupabaseConfigured } from '../lib/supabaseClient';
+import { getSupabaseClient, getSupabaseUrl, getSupabaseAnonKey, isSupabaseConfigured } from '../lib/supabaseClient';
 
 const API_KEY =
   process.env.GOOGLE_MAPS_PLATFORM_KEY ||
@@ -80,8 +80,14 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
 
   const fetchHazards = async () => {
     try {
+      const headers: Record<string, string> = {};
+      const clientUrl = getSupabaseUrl();
+      const clientKey = getSupabaseAnonKey();
+      if (clientUrl) headers['x-supabase-url'] = clientUrl;
+      if (clientKey) headers['x-supabase-key'] = clientKey;
+
       // 1. Fetch from Server Cloud API
-      const res = await fetch('/api/hazards');
+      const res = await fetch('/api/hazards', { headers });
       if (res.ok) {
         const json = await res.json();
         if (json.status === 'success' && Array.isArray(json.hazards) && json.hazards.length > 0) {
@@ -149,10 +155,16 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
     setHazards(prev => [newReport, ...prev]);
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const clientUrl = getSupabaseUrl();
+      const clientKey = getSupabaseAnonKey();
+      if (clientUrl) headers['x-supabase-url'] = clientUrl;
+      if (clientKey) headers['x-supabase-key'] = clientKey;
+
       // 1. Post to Server Cloud API
       await fetch('/api/hazards', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(newReport)
       });
 

@@ -106,7 +106,7 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
     setErrorMsg('');
 
     try {
-      const newAcc = await createAccountAsync({
+      const { account: newAcc, syncResult } = await createAccountAsync({
         username: usernameInput.trim(),
         fullName: fullName.trim(),
         phone: phone.trim(),
@@ -115,6 +115,10 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
         parentPhone: parentPhone.trim(),
         parentEmail: parentEmail.trim()
       });
+
+      if (!syncResult.success) {
+        console.warn('Account saved locally, Supabase notice:', syncResult.message);
+      }
 
       onLoginSuccess(newAcc.username);
       resetModalState();
