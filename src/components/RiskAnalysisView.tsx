@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Cpu, ShieldCheck, AlertTriangle, Sparkles, RefreshCw, Layers, CheckCircle2, FileJson } from 'lucide-react';
 import { RiskAnalysisResult, LanguageCode, UnitSystem } from '../types';
 import { t } from '../translations';
+import { updateLastTripAnalysis } from '../lib/accountManager';
 
 interface RiskAnalysisViewProps {
   lastTripSummary: any;
@@ -45,6 +46,7 @@ export const RiskAnalysisView: React.FC<RiskAnalysisViewProps> = ({
   const [aiCoachAdvice, setAiCoachAdvice] = useState<string | null>(
     'Vehicle is currently parked or stationary. Start a safe drive from the main dashboard to record real motion telemetry!'
   );
+  const [aiCoachSource, setAiCoachSource] = useState<string>('Initialization');
 
   React.useEffect(() => {
     if (lastTripSummary) {
@@ -77,6 +79,7 @@ export const RiskAnalysisView: React.FC<RiskAnalysisViewProps> = ({
 
       const data = await res.json();
       setAnalysisResult(data);
+      updateLastTripAnalysis(data);
 
       // Trigger AI Safety Coach
       fetchAiCoach(data.trip_summary);
@@ -100,6 +103,7 @@ export const RiskAnalysisView: React.FC<RiskAnalysisViewProps> = ({
       });
       const data = await res.json();
       setAiCoachAdvice(data.advice);
+      if (data.source) setAiCoachSource(data.source);
     } catch (err) {
       console.error('AI Coach error:', err);
     } finally {
@@ -224,11 +228,18 @@ export const RiskAnalysisView: React.FC<RiskAnalysisViewProps> = ({
           <div className="lg:col-span-7 space-y-6">
             {/* Gemini AI Driving Coach Feedback */}
             <div className="glass-card p-6 border border-[#2dd4bf]/30 relative">
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="w-5 h-5 text-[#2dd4bf] animate-spin" style={{ animationDuration: '6s' }} />
-                <h3 className="card-title text-base mb-0 text-[#2dd4bf]">
-                  Gemini AI Safety Coach ({currentLanguage.toUpperCase()})
-                </h3>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-[#2dd4bf] animate-spin" style={{ animationDuration: '6s' }} />
+                  <h3 className="card-title text-base mb-0 text-[#2dd4bf]">
+                    Gemini AI Safety Coach ({currentLanguage.toUpperCase()})
+                  </h3>
+                </div>
+                {aiCoachSource && (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-white/10">
+                    {aiCoachSource}
+                  </span>
+                )}
               </div>
 
               {aiLoading ? (

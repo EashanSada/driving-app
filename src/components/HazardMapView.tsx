@@ -303,7 +303,6 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
                   defaultCenter={{ lat: 37.7749, lng: -122.4194 }}
                   defaultZoom={13}
                   mapId="DEMO_MAP_ID"
-                  internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
                   style={{ width: '100%', height: '100%' }}
                 >
                   {hazards.map((h) => (

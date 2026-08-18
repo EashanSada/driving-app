@@ -1,7 +1,7 @@
 /**
  * DriveSafe Youth Initiative - Telematics Engine & Canvas G-Force HUD
- * Handles live phone sensor access, simulated driving scenarios,
- * and vector G-Force HUD canvas rendering.
+ * Handles live phone sensor access, GPS distance calculation,
+ * vibration filtering, and vector G-Force HUD canvas rendering.
  */
 
 class TelematicsEngine {
@@ -31,6 +31,14 @@ class TelematicsEngine {
 
     this.lastLat = null;
     this.lastLng = null;
+    this.lastGpsTime = null;
+    this.lastMetricsTime = null;
+    this.hasLiveGpsFix = false;
+    this.filteredGx = 0.0;
+    this.filteredGy = 0.0;
+    this.filteredGz = 1.0;
+    this.prevGy = 0.0;
+
     this.initSensors();
     if (this.canvas) {
       this.startHudAnimationLoop();
@@ -68,7 +76,7 @@ class TelematicsEngine {
             if (typeof nativeData.speedKmh === 'number') {
               this.state.speedKmh = nativeData.speedKmh;
             }
-            this.updateMetrics();
+            this.updateSensorMetricsOnly();
             return;
           } catch (e) {
             console.warn('Native Bridge error:', e);
@@ -80,23 +88,28 @@ class TelematicsEngine {
           // Normalize to G (1G = 9.81 m/s^2)
           const rawGx = accel.x / 9.81;
           const rawGy = accel.y / 9.81;
-          const rawGz = (accel.z || 9.81) / 9.81;
+          const rawGz = (accel.z !== null && accel.z !== undefined) ? accel.z / 9.81 : 1.0;
 
-          // Apply Low-pass Exponential Moving Average Filter (alpha = 0.3) to dampen high-frequency road vibrations (train tracks/potholes)
-          const alpha = 0.3;
-          this.filteredGx = this.filteredGx !== undefined ? (this.filteredGx * (1 - alpha) + rawGx * alpha) : rawGx;
-          this.filteredGy = this.filteredGy !== undefined ? (this.filteredGy * (1 - alpha) + rawGy * alpha) : rawGy;
-          this.filteredGz = this.filteredGz !== undefined ? (this.filteredGz * (1 - alpha) + rawGz * alpha) : rawGz;
+          // Low-pass Exponential Moving Average Filter (alpha = 0.2) to smooth high-frequency vehicle vibration
+          const alpha = 0.2;
+          this.filteredGx = this.filteredGx * (1 - alpha) + rawGx * alpha;
+          this.filteredGy = this.filteredGy * (1 - alpha) + rawGy * alpha;
+          this.filteredGz = this.filteredGz * (1 - alpha) + rawGz * alpha;
 
-          this.state.gForceX = parseFloat(this.filteredGx.toFixed(2));
-          this.state.gForceY = parseFloat(this.filteredGy.toFixed(2));
+          // Deadband for tiny stationary phone vibration (< 0.05 G)
+          const cleanGx = Math.abs(this.filteredGx) < 0.05 ? 0.0 : this.filteredGx;
+          const cleanGy = Math.abs(this.filteredGy) < 0.05 ? 0.0 : this.filteredGy;
+
+          this.state.gForceX = parseFloat(cleanGx.toFixed(2));
+          this.state.gForceY = parseFloat(cleanGy.toFixed(2));
           this.state.gForceZ = parseFloat(this.filteredGz.toFixed(2));
-          this.updateMetrics();
+          
+          this.updateSensorMetricsOnly();
         }
       });
     }
 
-    // 2. Live GPS Geolocation Watcher
+    // 2. Live GPS Geolocation Watcher with Real Haversine Distance Accumulation
     if (navigator.geolocation) {
       try {
         this.geoWatchId = navigator.geolocation.watchPosition(
@@ -104,24 +117,55 @@ class TelematicsEngine {
             if (!this.isTracking || this.useDemoSimulation) return;
 
             const coords = position.coords;
+            const now = Date.now();
+
             if (coords) {
+              // 1. Evaluate GPS Position Accuracy
+              const accuracy = coords.accuracy || 100;
+              const hasAccurateFix = accuracy <= 50;
+
+              if (hasAccurateFix && typeof coords.latitude === 'number' && typeof coords.longitude === 'number') {
+                this.hasLiveGpsFix = true;
+
+                if (this.lastLat !== null && this.lastLng !== null && this.lastGpsTime) {
+                  const dKm = this.calculateDistanceKm(this.lastLat, this.lastLng, coords.latitude, coords.longitude);
+                  const dtHours = (now - this.lastGpsTime) / 3600000;
+
+                  // Filter out GPS stationary drift: only accumulate if vehicle moved >= 6 meters (0.006 km)
+                  if (dKm >= 0.006) {
+                    // Sanity check: prevent GPS teleport jumps (implied speed must be < 200 km/h)
+                    const impliedKmh = dtHours > 0 ? (dKm / dtHours) : 0;
+                    if (impliedKmh < 200) {
+                      this.state.distanceKm += dKm;
+                      this.lastLat = coords.latitude;
+                      this.lastLng = coords.longitude;
+                      this.lastGpsTime = now;
+                    }
+                  }
+                } else {
+                  this.lastLat = coords.latitude;
+                  this.lastLng = coords.longitude;
+                  this.lastGpsTime = now;
+                }
+              }
+
+              // 2. Evaluate GPS Speed
               if (coords.speed !== null && coords.speed !== undefined && !isNaN(coords.speed) && coords.speed >= 0) {
-                // Convert m/s to km/h (filter out noise below 1 km/h)
+                // Convert m/s to km/h (filter noise below 1.5 km/h)
                 const realKmh = coords.speed * 3.6;
-                this.state.speedKmh = realKmh >= 1.0 ? parseFloat(realKmh.toFixed(1)) : 0.0;
-              } else {
-                // Stationary or speed unavailable
-                this.state.speedKmh = 0.0;
+                this.state.speedKmh = realKmh >= 1.5 ? parseFloat(realKmh.toFixed(1)) : 0.0;
+              } else if (this.lastLat && this.lastGpsTime) {
+                // Speed estimated from GPS delta
+                const dtSec = (now - this.lastGpsTime) / 1000;
+                if (dtSec > 4.0) {
+                  this.state.speedKmh = 0.0;
+                }
               }
 
               if (coords.heading !== null && coords.heading !== undefined && !isNaN(coords.heading)) {
                 this.state.headingDeg = Math.round(coords.heading);
               }
-
-              this.lastLat = coords.latitude;
-              this.lastLng = coords.longitude;
             }
-            this.updateMetrics();
           },
           (err) => {
             console.warn('GPS location access notice:', err.message);
@@ -142,10 +186,10 @@ class TelematicsEngine {
     const R = 6371; // Earth's radius in km
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
               Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
 
@@ -156,6 +200,10 @@ class TelematicsEngine {
     this.useDemoSimulation = demoMode;
     this.state.tripStartTime = Date.now();
     this.lastMetricsTime = Date.now();
+    this.lastGpsTime = null;
+    this.lastLat = null;
+    this.lastLng = null;
+    this.hasLiveGpsFix = false;
     this.state.distanceKm = 0.0;
     this.state.harshBrakingCount = 0;
     this.state.harshCorneringCount = 0;
@@ -164,16 +212,23 @@ class TelematicsEngine {
     this.state.gForceX = 0.0;
     this.state.gForceY = 0.0;
     this.state.gForceZ = 1.0;
+    this.filteredGx = 0.0;
+    this.filteredGy = 0.0;
+    this.filteredGz = 1.0;
+    this.prevGy = 0.0;
+    this.brakingTicks = 0;
+    this.corneringTicks = 0;
 
     if (this.simInterval) clearInterval(this.simInterval);
 
+    // Fixed 250ms Telemetry Loop (4 Hz)
     this.simInterval = setInterval(() => {
       if (!this.isTracking) return;
-      
+
       if (this.useDemoSimulation) {
         this.runDemoDriveTick();
       } else {
-        this.updateMetrics();
+        this.runLiveTelemetryTick();
       }
     }, 250);
   }
@@ -181,59 +236,67 @@ class TelematicsEngine {
   setDemoSpeed(kmh) {
     this.useDemoSimulation = true;
     this.state.speedKmh = Math.max(0, kmh);
-    this.updateMetrics();
   }
 
   runDemoDriveTick() {
-    this.state.speedKmh += (Math.random() - 0.48) * 2;
-    this.state.speedKmh = Math.max(0, Math.min(120, this.state.speedKmh));
-    this.state.gForceX = parseFloat(((Math.random() - 0.5) * 0.2).toFixed(2));
-    this.state.gForceY = parseFloat(((Math.random() - 0.48) * 0.2).toFixed(2));
+    // Smooth controlled demo simulation
+    this.state.speedKmh += (Math.random() - 0.48) * 1.5;
+    this.state.speedKmh = Math.max(10, Math.min(80, this.state.speedKmh));
+    this.state.gForceX = parseFloat(((Math.random() - 0.5) * 0.15).toFixed(2));
+    this.state.gForceY = parseFloat(((Math.random() - 0.48) * 0.15).toFixed(2));
     this.state.gForceZ = 1.0;
-    this.updateMetrics();
+
+    // Accumulate distance accurately: (speed km/h / 3600 s/h) * 0.25 s
+    this.state.distanceKm += (this.state.speedKmh / 3600) * 0.25;
+
+    this.processTickTelemetry(0.25);
   }
 
-  stopTracking() {
-    this.isTracking = false;
-    if (this.simInterval) clearInterval(this.simInterval);
-    return this.getTripSummary();
-  }
-
-  updateMetrics() {
-    // 1. Calculate precise wall-clock time delta since last metrics update
+  runLiveTelemetryTick() {
     const now = Date.now();
-    if (this.isTracking && this.lastMetricsTime) {
-      const dtSeconds = (now - this.lastMetricsTime) / 1000;
-      // Cap dt to prevent massive jumps when tab is backgrounded
-      if (dtSeconds > 0 && dtSeconds < 2.0) {
-        if (this.state.speedKmh > 0) {
-          // distance = (speed in km/h / 3600 s/h) * dtSeconds
-          this.state.distanceKm += (this.state.speedKmh / 3600) * dtSeconds;
-        }
-      }
-    }
+    const dtSeconds = this.lastMetricsTime ? Math.min(1.0, (now - this.lastMetricsTime) / 1000) : 0.25;
     this.lastMetricsTime = now;
 
-    // Calculate total G-Force magnitude minus gravity
+    // If live GPS coordinates are NOT available, use dead-reckoning speed integration
+    if (!this.hasLiveGpsFix && this.state.speedKmh > 0) {
+      this.state.distanceKm += (this.state.speedKmh / 3600) * dtSeconds;
+    }
+
+    this.processTickTelemetry(dtSeconds);
+  }
+
+  updateSensorMetricsOnly() {
+    // Quick sensor magnitude update for canvas responsiveness
     const netZ = this.state.gForceZ - 1.0;
     this.state.gForceMag = Math.sqrt(
-      Math.pow(this.state.gForceX, 2) + 
-      Math.pow(this.state.gForceY, 2) + 
+      Math.pow(this.state.gForceX, 2) +
+      Math.pow(this.state.gForceY, 2) +
+      Math.pow(netZ, 2)
+    );
+    this.notifySubscribers();
+  }
+
+  processTickTelemetry(dtSeconds) {
+    const netZ = this.state.gForceZ - 1.0;
+    this.state.gForceMag = Math.sqrt(
+      Math.pow(this.state.gForceX, 2) +
+      Math.pow(this.state.gForceY, 2) +
       Math.pow(netZ, 2)
     );
 
-    // Calculate Jerk (m/s^3)
-    this.state.jerkMs3 = Math.abs(this.state.gForceY) * 9.81 * 0.4;
+    // Calculate Jerk (m/s^3) based on longitudinal change
+    const deltaGy = this.state.gForceY - this.prevGy;
+    this.prevGy = this.state.gForceY;
+    const rawJerk = dtSeconds > 0 ? (Math.abs(deltaGy) * 9.81) / dtSeconds : 0.0;
+    this.state.jerkMs3 = parseFloat(Math.min(15.0, rawJerk).toFixed(2));
 
-    // Detect harsh events with road bump (train tracks / pothole) suppression
-    // Train tracks create high vertical shock (|netZ| > 0.5) without sustained deceleration.
-    const isVerticalRoadBump = Math.abs(netZ) > 0.5;
+    // Road bump suppression: high vertical shock (|netZ| > 0.55) indicates train tracks or potholes rather than hard braking
+    const isVerticalRoadBump = Math.abs(netZ) > 0.55;
 
-    // Harsh Braking: Require gForceY < -0.42 AND avoid single-tick vertical shock spikes
-    if (this.state.gForceY < -0.42) {
+    // Genuine Harsh Braking: Deceleration exceeding -0.45 G sustained for 2 ticks (~500ms)
+    if (this.state.gForceY < -0.45 && !isVerticalRoadBump) {
       this.brakingTicks = (this.brakingTicks || 0) + 1;
-      // Require sustained g-force for 2 consecutive ticks (~500ms) or non-bump event
-      if (this.brakingTicks === 2 && !isVerticalRoadBump) {
+      if (this.brakingTicks === 2) {
         this.state.harshBrakingCount++;
         if (window.AndroidBridge && window.AndroidBridge.triggerHapticWarning) {
           window.AndroidBridge.triggerHapticWarning('HARSH_BRAKING');
@@ -243,17 +306,17 @@ class TelematicsEngine {
       this.brakingTicks = 0;
     }
 
-    // Harsh Cornering: Require |gForceX| > 0.45 sustained for 2 ticks and not a vertical bump
-    if (Math.abs(this.state.gForceX) > 0.45) {
+    // Genuine Harsh Cornering: Lateral G-Force |gForceX| > 0.45 G sustained for 2 ticks (~500ms)
+    if (Math.abs(this.state.gForceX) > 0.45 && !isVerticalRoadBump) {
       this.corneringTicks = (this.corneringTicks || 0) + 1;
-      if (this.corneringTicks === 2 && !isVerticalRoadBump) {
+      if (this.corneringTicks === 2) {
         this.state.harshCorneringCount++;
       }
     } else {
       this.corneringTicks = 0;
     }
 
-    // Record time-series telemetry data point
+    // Time-series recording
     const point = {
       timestamp: Date.now(),
       velocity: parseFloat(this.state.speedKmh.toFixed(1)),
@@ -268,8 +331,13 @@ class TelematicsEngine {
       this.state.telemetryHistory.shift();
     }
 
-    // Notify listeners
     this.notifySubscribers();
+  }
+
+  stopTracking() {
+    this.isTracking = false;
+    if (this.simInterval) clearInterval(this.simInterval);
+    return this.getTripSummary();
   }
 
   subscribe(callback) {
@@ -277,13 +345,16 @@ class TelematicsEngine {
   }
 
   notifySubscribers() {
-    this.subscribers.forEach(cb => cb(this.state));
+    this.subscribers.forEach((cb) => cb(this.state));
   }
 
   getTripSummary() {
+    const durationSec = Math.max(1, Math.round((Date.now() - this.state.tripStartTime) / 1000));
     return {
-      durationSec: Math.round((Date.now() - this.state.tripStartTime) / 1000),
-      distanceKm: parseFloat(this.state.distanceKm.toFixed(2)),
+      durationSec,
+      duration_seconds: durationSec,
+      distanceKm: parseFloat(this.state.distanceKm.toFixed(3)),
+      distance_km: parseFloat(this.state.distanceKm.toFixed(3)),
       harshBrakingCount: this.state.harshBrakingCount,
       harshCorneringCount: this.state.harshCorneringCount,
       telemetry: [...this.state.telemetryHistory]

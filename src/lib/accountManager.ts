@@ -462,23 +462,25 @@ export function recordTripForActiveUser(tripSummary: any, unitSystem: UnitSystem
   const rawDist = typeof tripSummary?.distanceKm === 'number'
     ? tripSummary.distanceKm
     : (typeof tripSummary?.distance_km === 'number' ? tripSummary.distance_km : 0);
-  const distanceKm = rawDist > 0 ? rawDist : 1.0;
-  const distanceMiles = distanceKm * 0.621371;
-  const durationSeconds = tripSummary?.duration_seconds || 120;
+  const distanceKm = typeof rawDist === 'number' && rawDist >= 0 ? rawDist : 0;
+  const distanceMiles = parseFloat((distanceKm * 0.621371).toFixed(2));
+  const durationSeconds = tripSummary?.duration_seconds || tripSummary?.durationSec || 60;
   
   const classification = tripSummary?.classification || {};
-  const tripSafetyScore = typeof classification.safety_score === 'number' ? classification.safety_score : 90;
+  const tripSafetyScore = typeof classification.safety_score === 'number' ? classification.safety_score : 95;
   
-  const avgVelKmh = tripSummary?.trip_summary?.avg_velocity_kmh || 35;
-  const maxSpeedMph = (tripSummary?.trip_summary?.max_velocity_kmh || avgVelKmh * 1.3) * 0.621371;
-  const harshEvents = (tripSummary?.trip_summary?.harsh_braking_count || 0) + (tripSummary?.trip_summary?.harsh_cornering_count || 0);
+  const avgVelKmh = tripSummary?.trip_summary?.avg_velocity_kmh || (tripSummary?.telemetry?.length ? (tripSummary.telemetry.reduce((a: any, b: any) => a + (b.velocity || 0), 0) / tripSummary.telemetry.length) : 0);
+  const maxSpeedKmh = tripSummary?.trip_summary?.max_velocity_kmh || (tripSummary?.telemetry?.length ? Math.max(...tripSummary.telemetry.map((t: any) => t.velocity || 0)) : avgVelKmh);
+  const maxSpeedMph = parseFloat((maxSpeedKmh * 0.621371).toFixed(1));
+  const harshEvents = (tripSummary?.harshBrakingCount || tripSummary?.trip_summary?.harsh_braking_count || 0) + 
+                      (tripSummary?.harshCorneringCount || tripSummary?.trip_summary?.harsh_cornering_count || 0);
 
   const isClean = tripSafetyScore >= 80;
 
   // New totals
   const newTotalTrips = account.totalTrips + 1;
   const newCleanTrips = account.cleanTrips + (isClean ? 1 : 0);
-  const newTotalDistMiles = account.totalDistanceMiles + distanceMiles;
+  const newTotalDistMiles = parseFloat((account.totalDistanceMiles + distanceMiles).toFixed(2));
   
   // Weighted average safety score
   const newAvgSafetyScore = Math.round(
@@ -539,6 +541,40 @@ export function recordTripForActiveUser(tripSummary: any, unitSystem: UnitSystem
     nextLevelXp: nextXp,
     badgesUnlocked: newBadges,
     tripHistory: [newTripRecord, ...account.tripHistory]
+  };
+
+  saveAccount(updatedAccount);
+  return updatedAccount;
+}
+
+export function updateLastTripAnalysis(analysisData: any): UserAccount | null {
+  const activeUsername = getActiveUsername();
+  if (!activeUsername) return null;
+
+  const account = getAccount(activeUsername);
+  if (!account || !account.tripHistory.length) return null;
+
+  const classification = analysisData?.classification || {};
+  if (typeof classification.safety_score !== 'number') return account;
+
+  const updatedScore = classification.safety_score;
+  const history = [...account.tripHistory];
+  history[0] = {
+    ...history[0],
+    safetyScore: updatedScore
+  };
+
+  // Recalculate average safety score
+  const totalScoreSum = history.reduce((sum, trip) => sum + trip.safetyScore, 0);
+  const newAvgScore = Math.round(totalScoreSum / history.length);
+
+  const cleanTripsCount = history.filter(t => t.safetyScore >= 80).length;
+
+  const updatedAccount: UserAccount = {
+    ...account,
+    safetyScore: newAvgScore,
+    cleanTrips: cleanTripsCount,
+    tripHistory: history
   };
 
   saveAccount(updatedAccount);
