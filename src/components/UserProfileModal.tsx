@@ -112,28 +112,40 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-3 pt-2 border-t border-white/10">
+          <div className="space-y-2 pt-2 border-t border-white/10">
             <button
               onClick={() => {
-                onClose();
-                onSwitchAccount();
+                window.print();
               }}
-              className="flex-1 py-2.5 rounded-xl bg-[#2dd4bf]/20 border border-[#2dd4bf]/40 text-[#2dd4bf] font-bold text-xs hover:bg-[#2dd4bf]/30 transition-all cursor-pointer text-center"
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#a78bfa] text-slate-950 font-bold text-xs hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 glow-mint"
             >
-              Switch Account
+              <Award className="w-4 h-4" />
+              <span>Export Official Safety Certificate (PDF)</span>
             </button>
 
-            <button
-              onClick={() => {
-                clearActiveUsername();
-                onLogout();
-                onClose();
-              }}
-              className="px-4 py-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-bold text-xs hover:bg-rose-500/30 transition-all cursor-pointer flex items-center gap-1.5"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Log Out</span>
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  onClose();
+                  onSwitchAccount();
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-[#2dd4bf]/20 border border-[#2dd4bf]/40 text-[#2dd4bf] font-bold text-xs hover:bg-[#2dd4bf]/30 transition-all cursor-pointer text-center"
+              >
+                Switch Account
+              </button>
+
+              <button
+                onClick={() => {
+                  clearActiveUsername();
+                  onLogout();
+                  onClose();
+                }}
+                className="px-4 py-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-bold text-xs hover:bg-rose-500/30 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Log Out</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -74,13 +74,23 @@ export const GdlTrackerView: React.FC = () => {
             </p>
           </div>
 
-          <button
-            onClick={() => setShowLogModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#a78bfa] text-slate-950 font-bold text-xs hover:shadow-lg transition-all cursor-pointer glow-mint shrink-0"
-          >
-            <Plus className="w-4 h-4 fill-slate-950" />
-            <span>Log Supervised Hours</span>
-          </button>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#020617] border border-white/15 hover:border-white/30 text-white font-bold text-xs transition-all cursor-pointer"
+            >
+              <FileCheck className="w-4 h-4 text-[#a78bfa]" />
+              <span>Print / Save PDF Log</span>
+            </button>
+
+            <button
+              onClick={() => setShowLogModal(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#a78bfa] text-slate-950 font-bold text-xs hover:shadow-lg transition-all cursor-pointer glow-mint"
+            >
+              <Plus className="w-4 h-4 fill-slate-950" />
+              <span>Log Supervised Hours</span>
+            </button>
+          </div>
         </div>
       </div>
 

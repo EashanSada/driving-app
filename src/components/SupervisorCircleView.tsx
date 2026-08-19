@@ -12,7 +12,11 @@ import {
   Download,
   Share2,
   Check,
-  Sparkles
+  Sparkles,
+  Link,
+  Lock,
+  Search,
+  Eye
 } from 'lucide-react';
 import { getAccount, getActiveUsername, getAllAccounts, UserAccount } from '../lib/accountManager';
 import { getGdlProgress, getStoredTrips } from '../lib/offlineTripStore';
@@ -22,15 +26,26 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
   const activeUsername = getActiveUsername();
   const currentAccount = activeUsername ? getAccount(activeUsername) : null;
   const allAccounts = getAllAccounts();
-  const trips = getStoredTrips(activeUsername || undefined);
-  const gdl = getGdlProgress(activeUsername || undefined);
+
+  // Child / Teen Driver Selection (defaults to current user or first teen account)
+  const [selectedChildUsername, setSelectedChildUsername] = useState<string>(() => {
+    if (currentAccount?.role === 'young_driver' || currentAccount?.role === 'gdl_student') {
+      return activeUsername || 'alex_rivera';
+    }
+    const teen = allAccounts.find(a => a.role === 'young_driver' || a.role === 'gdl_student');
+    return teen?.username || activeUsername || 'alex_rivera';
+  });
+
+  const selectedChildAccount = getAccount(selectedChildUsername) || currentAccount;
+  const trips = getStoredTrips(selectedChildUsername);
+  const gdl = getGdlProgress(selectedChildUsername);
 
   const [activeTab, setActiveTab] = useState<'CIRCLE' | 'SCHOOL' | 'REPORT'>('CIRCLE');
   const [copiedCode, setCopiedCode] = useState(false);
   const [pairingInput, setPairingInput] = useState('');
-  const [pairingSuccess, setPairingSuccess] = useState(false);
+  const [pairingSuccessMsg, setPairingSuccessMsg] = useState('');
 
-  const supervisorCode = currentAccount?.supervisorCode || 'DS-7492-SAFE';
+  const supervisorCode = selectedChildAccount?.supervisorCode || `DS-7492-${(selectedChildUsername || 'SAFE').substring(0, 4).toUpperCase()}`;
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(supervisorCode);
@@ -40,12 +55,25 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
 
   const handlePair = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pairingInput.trim()) return;
-    setPairingSuccess(true);
+    const clean = pairingInput.trim();
+    if (!clean) return;
+
+    // Check if input is a known username or code
+    const matched = allAccounts.find(
+      a => a.username.toLowerCase() === clean.toLowerCase() || a.supervisorCode === clean
+    );
+
+    if (matched) {
+      setSelectedChildUsername(matched.username);
+      setPairingSuccessMsg(`Successfully linked with ${matched.fullName || matched.username}.`);
+    } else {
+      setPairingSuccessMsg(`Link key "${clean}" registered with Parent-Teen Circle.`);
+    }
+
     setTimeout(() => {
-      setPairingSuccess(false);
+      setPairingSuccessMsg('');
       setPairingInput('');
-    }, 3000);
+    }, 4000);
   };
 
   const handlePrintPdf = () => {
@@ -61,10 +89,10 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Users className="w-5 h-5 text-[#a78bfa]" />
-              <h2 className="text-xl font-bold text-white font-display">Supervised Circle & Driving School Portal</h2>
+              <h2 className="text-xl font-bold text-white font-display">Supervised Circle & Parent Portal</h2>
             </div>
             <p className="text-sm text-slate-300 max-w-2xl">
-              Connect parents, mentors, and driving instructors. Monitor telematics safety compliance and generate certified insurance & DMV PDF reports.
+              Connect parents, mentors, and driving instructors with teen drivers. Review safety ratings, track GDL hours, and export official insurance & DMV PDF reports.
             </p>
           </div>
 
@@ -101,100 +129,156 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
       {/* Tab 1: Parent-Teen Supervised Circle */}
       {activeTab === 'CIRCLE' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Pair Code & Status (5 cols) */}
-          <div className="lg:col-span-5 glass-card p-6 space-y-6">
-            <div className="space-y-2">
+          {/* Pair Code & How Linking Works (5 cols) */}
+          <div className="lg:col-span-5 glass-card p-6 space-y-6 flex flex-col justify-between">
+            <div className="space-y-3">
               <span className="card-title text-xs font-bold text-slate-300 uppercase block mb-0">
-                Supervision Link Key
+                Child Link Key & Pairing
               </span>
-              <p className="text-xs text-slate-400">
-                Share this secure one-time code with parents or mentors to link accounts.
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Teens can share their unique 6-digit key with a parent or mentor. Once linked, parents receive safe trip summaries and GDL log updates.
               </p>
 
-              <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#020617] border border-white/15 my-2">
-                <span className="font-mono text-base font-extrabold text-[#2dd4bf] tracking-wider">
-                  {supervisorCode}
+              <div className="p-3.5 rounded-xl bg-[#020617] border border-white/15 space-y-2">
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                  Active Driver Link Key ({selectedChildAccount?.username || 'Driver'})
                 </span>
-                <button
-                  onClick={handleCopyCode}
-                  className="px-3 py-1.5 rounded-lg bg-[#2dd4bf]/20 hover:bg-[#2dd4bf]/30 text-[#2dd4bf] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
-                  <span>{copiedCode ? 'Copied' : 'Share'}</span>
-                </button>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-base font-extrabold text-[#2dd4bf] tracking-wider">
+                    {supervisorCode}
+                  </span>
+                  <button
+                    onClick={handleCopyCode}
+                    className="px-3 py-1 rounded-lg bg-[#2dd4bf]/20 hover:bg-[#2dd4bf]/30 text-[#2dd4bf] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
+                    <span>{copiedCode ? 'Copied' : 'Copy'}</span>
+                  </button>
+                </div>
               </div>
             </div>
 
+            {/* Parent Enter Key Form */}
             <div className="pt-4 border-t border-white/10 space-y-3">
               <span className="card-title text-xs font-bold text-slate-300 uppercase block mb-0">
-                Link with a Driver
+                Link New Teen Driver
               </span>
-              <form onSubmit={handlePair} className="space-y-3">
-                <input
-                  type="text"
-                  value={pairingInput}
-                  onChange={(e) => setPairingInput(e.target.value)}
-                  placeholder="Enter driver link code (e.g. DS-7492-SAFE)"
-                  className="w-full bg-[#020617] border border-white/15 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#a78bfa]"
-                />
+              <form onSubmit={handlePair} className="space-y-2.5">
+                <div className="relative">
+                  <Link className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={pairingInput}
+                    onChange={(e) => setPairingInput(e.target.value)}
+                    placeholder="Enter key or username (e.g. DS-7492-ALEX)"
+                    className="w-full bg-[#020617] border border-white/15 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-[#a78bfa]"
+                  />
+                </div>
                 <button
                   type="submit"
                   className="w-full py-2.5 rounded-xl bg-[#a78bfa] text-slate-950 font-bold text-xs hover:shadow-lg transition-all cursor-pointer"
                 >
-                  Pair Supervisor Link
+                  Pair Supervisor Connection
                 </button>
               </form>
 
-              {pairingSuccess && (
+              {pairingSuccessMsg && (
                 <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  Supervisor link verified successfully.
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{pairingSuccessMsg}</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Linked Driver Status (7 cols) */}
-          <div className="lg:col-span-7 glass-card p-6 space-y-4">
-            <span className="card-title text-xs font-bold text-slate-300 uppercase block mb-2">
-              Supervised Driver Activity Feed
-            </span>
+          {/* Linked Teen Driver Dashboard (7 cols) */}
+          <div className="lg:col-span-7 glass-card p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <span className="card-title text-xs font-bold text-slate-300 uppercase block mb-0">
+                Supervised Teen Profile
+              </span>
 
-            <div className="space-y-3">
-              <div className="p-4 rounded-xl bg-[#020617]/70 border border-white/10 flex items-center justify-between">
+              {/* Quick switch between known drivers */}
+              {allAccounts.length > 1 && (
+                <div className="flex items-center gap-1 bg-[#020617] p-1 rounded-lg border border-white/10 text-xs">
+                  <span className="text-[10px] text-slate-400 px-1 font-bold">Driver:</span>
+                  <select
+                    value={selectedChildUsername}
+                    onChange={(e) => setSelectedChildUsername(e.target.value)}
+                    className="bg-transparent text-xs font-bold text-[#2dd4bf] focus:outline-none cursor-pointer"
+                  >
+                    {allAccounts.map(a => (
+                      <option key={a.username} value={a.username} className="bg-slate-900 text-white">
+                        {a.fullName || a.username} ({a.safetyScore} pts)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Teen Driver Card */}
+            <div className="p-4 rounded-xl bg-[#020617]/80 border border-white/10 space-y-4">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#2dd4bf]/20 border border-[#2dd4bf] flex items-center justify-center font-bold text-xs text-[#2dd4bf]">
-                    {(currentAccount?.username || 'JD').substring(0, 2).toUpperCase()}
+                  <div className="w-12 h-12 rounded-full bg-[#2dd4bf]/20 border border-[#2dd4bf] flex items-center justify-center font-black text-sm text-[#2dd4bf]">
+                    {(selectedChildAccount?.username || 'AL').substring(0, 2).toUpperCase()}
                   </div>
                   <div>
-                    <span className="font-bold text-white text-xs block">
-                      {currentAccount?.fullName || activeUsername || 'Alex Rivera'}
+                    <span className="font-bold text-white text-sm block">
+                      {selectedChildAccount?.fullName || selectedChildAccount?.username || 'Alex Rivera'}
                     </span>
-                    <span className="text-[11px] text-slate-400">
-                      {currentAccount?.licenseStage === 'permit' ? "Learner's Permit" : 'Provisional License'} • Logged{' '}
-                      {trips.length} sessions
+                    <span className="text-xs text-slate-400 uppercase font-mono">
+                      {selectedChildAccount?.licenseStage === 'permit' ? "Learner's Permit" : 'Provisional License'} • Stage
                     </span>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <span className="px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[#2dd4bf]/20 text-[#2dd4bf] border border-[#2dd4bf]/30">
-                    {currentAccount?.safetyScore || 96} pts
+                  <span className="px-3 py-1 rounded-full text-xs font-extrabold font-mono bg-[#2dd4bf]/20 text-[#2dd4bf] border border-[#2dd4bf]/30">
+                    {selectedChildAccount?.safetyScore || 96} / 100
                   </span>
-                  <span className="block text-[10px] text-emerald-400 font-mono mt-1">Status: Parked / Safe</span>
+                  <span className="block text-[10px] text-emerald-400 font-semibold mt-1">Status: Safe / Parked</span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-[#020617]/50 border border-white/10 space-y-2">
-                <span className="text-[11px] font-bold text-slate-300 uppercase block">
-                  Peace of Mind Privacy Principles
-                </span>
-                <ul className="text-xs text-slate-400 space-y-1.5 list-disc list-inside">
-                  <li>Zero persistent location surveillance — parents receive trip conclusion summaries only.</li>
-                  <li>Highlights defensive driving habits and GDL hours completion.</li>
-                  <li>Encourages open constructive mentoring over punitive tracking.</li>
-                </ul>
+              {/* Metrics Row */}
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/10 text-center">
+                <div className="p-2 rounded-lg bg-white/5">
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase">Clean Drives</span>
+                  <span className="text-sm font-bold font-mono text-emerald-400">
+                    {selectedChildAccount?.cleanTrips || 0} trips
+                  </span>
+                </div>
+                <div className="p-2 rounded-lg bg-white/5">
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase">GDL Hours</span>
+                  <span className="text-sm font-bold font-mono text-[#a78bfa]">
+                    {(gdl.completedDayHours + gdl.completedNightHours).toFixed(1)} / 50h
+                  </span>
+                </div>
+                <div className="p-2 rounded-lg bg-white/5">
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase">Total Distance</span>
+                  <span className="text-sm font-bold font-mono text-white">
+                    {(selectedChildAccount?.totalDistanceMiles || 0).toFixed(1)} mi
+                  </span>
+                </div>
               </div>
+            </div>
+
+            {/* Quick Action to PDF Report */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-[#2dd4bf]/10 to-[#a78bfa]/10 border border-white/10 flex items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-white block">Official PDF Certificate Ready</span>
+                <span className="text-[11px] text-slate-300">
+                  Ready for auto-insurance discount verification & state DMV log.
+                </span>
+              </div>
+              <button
+                onClick={() => setActiveTab('REPORT')}
+                className="px-3.5 py-1.5 rounded-lg bg-[#2dd4bf] text-slate-950 font-bold text-xs hover:shadow-lg transition-all cursor-pointer whitespace-nowrap"
+              >
+                View PDF Report
+              </button>
             </div>
           </div>
         </div>
@@ -335,7 +419,7 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
                   Driver Name
                 </span>
                 <span className="text-sm font-bold text-white print:text-black">
-                  {currentAccount?.fullName || activeUsername || 'Alex Rivera'}
+                  {selectedChildAccount?.fullName || selectedChildUsername || 'Alex Rivera'}
                 </span>
               </div>
               <div>
@@ -343,7 +427,7 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
                   License Status
                 </span>
                 <span className="text-sm font-bold text-white print:text-black uppercase">
-                  {currentAccount?.licenseStage || "Learner's Permit"}
+                  {selectedChildAccount?.licenseStage || "Learner's Permit"}
                 </span>
               </div>
               <div>
@@ -351,7 +435,7 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
                   Overall Score
                 </span>
                 <span className="text-sm font-bold font-mono text-[#2dd4bf] print:text-emerald-700">
-                  {currentAccount?.safetyScore || 96} / 100
+                  {selectedChildAccount?.safetyScore || 96} / 100
                 </span>
               </div>
               <div>
@@ -359,7 +443,7 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
                   Total Safe Miles
                 </span>
                 <span className="text-sm font-bold font-mono text-white print:text-black">
-                  {currentAccount?.totalDistanceMiles || 42.8} miles
+                  {(selectedChildAccount?.totalDistanceMiles || 42.8).toFixed(1)} miles
                 </span>
               </div>
             </div>
@@ -382,7 +466,7 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
                   <span className="text-[10px] text-slate-400 print:text-slate-600 block">Clean Trip Ratio</span>
                   <span className="text-base font-bold font-mono text-emerald-400 print:text-emerald-700">
                     {Math.round(
-                      ((currentAccount?.cleanTrips || 1) / Math.max(1, currentAccount?.totalTrips || 1)) * 100
+                      ((selectedChildAccount?.cleanTrips || 1) / Math.max(1, selectedChildAccount?.totalTrips || 1)) * 100
                     )}
                     %
                   </span>
@@ -395,7 +479,7 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
               <div>
                 <div className="border-b border-slate-500 pb-1 h-8 flex items-end">
                   <span className="font-mono text-slate-300 print:text-black">
-                    {currentAccount?.parentName || 'Verified Driving Instructor'}
+                    {selectedChildAccount?.parentName || 'Verified Parent / Mentor'}
                   </span>
                 </div>
                 <span className="text-[10px] text-slate-400 print:text-slate-600 block mt-1">
