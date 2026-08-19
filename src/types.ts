@@ -2,7 +2,9 @@ export type LanguageCode = 'en' | 'es' | 'fr' | 'zh';
 
 export type UnitSystem = 'imperial' | 'metric';
 
-export type NavTab = 'hud' | 'analysis' | 'leaderboard' | 'hazards' | 'gamification';
+export type UserRole = 'young_driver' | 'gdl_student' | 'parent_mentor' | 'driving_instructor';
+
+export type NavTab = 'hud' | 'analysis' | 'trips' | 'gdl' | 'supervisor' | 'leaderboard' | 'gamification' | 'hazards';
 
 export interface TelemetryPoint {
   timestamp: number;
@@ -11,6 +13,9 @@ export interface TelemetryPoint {
   g_force_y: number;
   g_force_z: number;
   braking_jerk: number;
+  lat?: number;
+  lng?: number;
+  speedLimitMph?: number;
 }
 
 export interface TelematicsState {
@@ -25,6 +30,56 @@ export interface TelematicsState {
   distanceKm: number;
   tripStartTime: number;
   telemetryHistory: TelemetryPoint[];
+}
+
+export interface TripBreadcrumb {
+  timestamp: number;
+  lat: number;
+  lng: number;
+  speedMph: number;
+  speedLimitMph: number;
+  isHarsh: boolean;
+  eventLabel?: string;
+}
+
+export interface StoredTrip {
+  id: string;
+  driverUsername: string;
+  startTime: number;
+  endTime: number;
+  durationSeconds: number;
+  distanceMiles: number;
+  safetyScore: number;
+  topSpeedMph: number;
+  avgSpeedMph: number;
+  harshBrakingCount: number;
+  harshCorneringCount: number;
+  isNightTrip: boolean;
+  weatherCondition: 'Clear' | 'Rain' | 'Fog' | 'Overcast';
+  syncedToCloud: boolean;
+  breadcrumbs: TripBreadcrumb[];
+  summaryNotes?: string[];
+}
+
+export interface GdlProgress {
+  requiredDayHours: number;
+  completedDayHours: number;
+  requiredNightHours: number;
+  completedNightHours: number;
+  totalRequiredHours: number;
+  permitIssueDate: string;
+  targetTestDate: string;
+  supervisedTripsCount: number;
+}
+
+export interface UserPreferences {
+  audioVoiceAlerts: boolean;
+  audioChimes: boolean;
+  autoTripDetection: boolean;
+  speedLimitWarnings: boolean;
+  offlineSyncEnabled: boolean;
+  role: UserRole;
+  gdlEnabled: boolean;
 }
 
 export interface RiskAnalysisResult {
@@ -45,22 +100,9 @@ export interface RiskAnalysisResult {
     safety_score: number;
     risk_category: 'SAFE' | 'MODERATE' | 'HIGH_RISK';
     color_code: string;
-    vector: [number, number, number]; // [speedRisk, gForceRisk, jerkRisk]
+    vector: [number, number, number];
   };
   key_risk_factors: string[];
-}
-
-export interface LeaderboardUser {
-  id: string;
-  full_name: string;
-  cohort: string;
-  safety_score: number;
-  clean_trips: number;
-  badge: 'PLATINUM_GUARDIAN' | 'GOLD_GUARDIAN' | 'SILVER_GUARDIAN' | 'BRONZE_GUARDIAN';
-  points: number;
-  language: string;
-  level?: number;
-  xp?: number;
 }
 
 export interface HazardReport {
@@ -81,64 +123,10 @@ export interface BadgeMilestone {
   description: string;
   iconName: string;
   unlocked: boolean;
-  progress: number; // 0 to 100
+  progress: number;
   unlockedAt?: string;
   category: 'MILESTONE' | 'SAFETY' | 'COMMUNITY' | 'MASTERY';
   pointsReward: number;
-}
-
-export interface UserProfile {
-  id: string;
-  full_name: string;
-  email: string;
-  youth_cohort: string;
-  avatar_url?: string;
-  level: number;
-  current_xp: number;
-  next_level_xp: number;
-  total_points: number;
-  safety_score: number;
-  total_distance_miles: number;
-  clean_trips_count: number;
-  badges_unlocked: string[];
-  joined_date: string;
-}
-
-export interface YouthGroup {
-  id: string;
-  name: string;
-  description: string;
-  category: 'REGIONAL' | 'SCHOOL' | 'SAFETY_CLUB' | 'ECO_DRIVERS';
-  member_count: number;
-  avg_group_score: number;
-  is_joined: boolean;
-  avatar_color: string;
-}
-
-export interface GroupMessage {
-  id: string;
-  group_id: string;
-  sender_name: string;
-  sender_avatar?: string;
-  sender_role: string;
-  content: string;
-  timestamp: string;
-  reactions_count: number;
-  achievement_share?: {
-    title: string;
-    score: number;
-    badge: string;
-  };
-}
-
-export interface GoogleMapPlace {
-  id: string;
-  name: string;
-  category: string;
-  formatted_address: string;
-  rating?: number;
-  lat: number;
-  lng: number;
 }
 
 export interface RouteSearchResult {
@@ -158,4 +146,3 @@ declare global {
     DriveSafeApp: any;
   }
 }
-

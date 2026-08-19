@@ -5,6 +5,9 @@ export const translations = {
     // Nav & Header
     nav_hud: 'Drive Dashboard',
     nav_analysis: 'Safety Score',
+    nav_trips: 'Trip History',
+    nav_gdl: 'GDL Hours Tracker',
+    nav_supervisor: 'Supervised Circle',
     nav_leaderboard: 'Leaderboard',
     nav_gamification: 'Badges & Milestones',
     nav_community: 'Driver Groups',
@@ -104,6 +107,9 @@ export const translations = {
     // Nav & Header
     nav_hud: 'Panel de Conducción',
     nav_analysis: 'Puntaje de Seguridad',
+    nav_trips: 'Historial de Viajes',
+    nav_gdl: 'Horas GDL',
+    nav_supervisor: 'Círculo de Supervisión',
     nav_leaderboard: 'Clasificación',
     nav_gamification: 'Insignias y Logros',
     nav_community: 'Grupos de Conductores',
@@ -203,6 +209,9 @@ export const translations = {
     // Nav & Header
     nav_hud: 'Tableau de Bord',
     nav_analysis: 'Score de Sécurité',
+    nav_trips: 'Historique des Trajets',
+    nav_gdl: 'Heures GDL',
+    nav_supervisor: 'Cercle de Supervision',
     nav_leaderboard: 'Classement',
     nav_gamification: 'Badges & Jalons',
     nav_community: 'Groupes de Conducteurs',
@@ -302,6 +311,9 @@ export const translations = {
     // Nav & Header
     nav_hud: '驾驶仪表板',
     nav_analysis: '安全评分',
+    nav_trips: '行程记录',
+    nav_gdl: 'GDL 实习学时',
+    nav_supervisor: '监护辅导圈',
     nav_leaderboard: '排行榜',
     nav_gamification: '成就与里程碑',
     nav_community: '车友组群',

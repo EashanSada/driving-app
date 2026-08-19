@@ -1,5 +1,6 @@
-import { UnitSystem } from '../types';
+import { UnitSystem, UserRole, UserPreferences, StoredTrip, TripBreadcrumb } from '../types';
 import { getSupabaseClient, getSupabaseUrl, getSupabaseAnonKey, isSupabaseConfigured } from './supabaseClient';
+import { saveTrip } from './offlineTripStore';
 
 export interface TripRecord {
   id: string;
@@ -16,6 +17,8 @@ export interface UserAccount {
   fullName: string;
   phone?: string;
   email?: string;
+  role?: UserRole;
+  licenseStage?: 'permit' | 'provisional' | 'full';
   parentName?: string;
   parentPhone?: string;
   parentEmail?: string;
@@ -30,6 +33,8 @@ export interface UserAccount {
   nextLevelXp: number;
   badgesUnlocked: string[];
   tripHistory: TripRecord[];
+  preferences?: UserPreferences;
+  supervisorCode?: string;
 }
 
 const ACTIVE_USER_KEY = 'drivesafe_active_username_v2';
@@ -519,8 +524,9 @@ export function recordTripForActiveUser(tripSummary: any, unitSystem: UnitSystem
     newBadges.push('PLATINUM_GUARDIAN');
   }
 
+  const tripId = `trip_${Date.now()}`;
   const newTripRecord: TripRecord = {
-    id: `trip_${Date.now()}`,
+    id: tripId,
     timestamp: Date.now(),
     distanceMiles,
     durationSeconds,
@@ -528,6 +534,41 @@ export function recordTripForActiveUser(tripSummary: any, unitSystem: UnitSystem
     maxSpeedMph,
     harshEvents
   };
+
+  // Construct detailed StoredTrip for route replay & offline sync
+  const isNight = new Date().getHours() >= 19 || new Date().getHours() < 6;
+  const rawBreadcrumbs: TripBreadcrumb[] = (tripSummary?.telemetry || []).map((t: any, idx: number) => ({
+    timestamp: t.timestamp || (Date.now() - (tripSummary.telemetry.length - idx) * 1000),
+    lat: t.lat || (37.7749 + (idx * 0.0003)),
+    lng: t.lng || (-122.4194 + (Math.sin(idx / 5) * 0.0004)),
+    speedMph: parseFloat(((t.velocity || 0) * 0.621371).toFixed(1)),
+    speedLimitMph: t.speedLimitMph || 35,
+    isHarsh: Math.abs(t.braking_jerk || 0) > 2.5 || Math.sqrt((t.g_force_x || 0) ** 2 + (t.g_force_y || 0) ** 2) > 0.55,
+    eventLabel: Math.abs(t.braking_jerk || 0) > 2.5 ? 'Abrupt Brake' : (Math.sqrt((t.g_force_x || 0) ** 2 + (t.g_force_y || 0) ** 2) > 0.55 ? 'Abrupt Turn' : undefined)
+  }));
+
+  const fullStoredTrip: StoredTrip = {
+    id: tripId,
+    driverUsername: activeUsername,
+    startTime: tripSummary?.tripStartTime || (Date.now() - durationSeconds * 1000),
+    endTime: Date.now(),
+    durationSeconds,
+    distanceMiles,
+    safetyScore: tripSafetyScore,
+    topSpeedMph: maxSpeedMph,
+    avgSpeedMph: parseFloat((avgVelKmh * 0.621371).toFixed(1)),
+    harshBrakingCount: tripSummary?.harshBrakingCount || 0,
+    harshCorneringCount: tripSummary?.harshCorneringCount || 0,
+    isNightTrip: isNight,
+    weatherCondition: tripSummary?.weatherCondition || 'Clear',
+    syncedToCloud: false,
+    breadcrumbs: rawBreadcrumbs.length > 0 ? rawBreadcrumbs : [
+      { timestamp: Date.now() - 30000, lat: 37.7749, lng: -122.4194, speedMph: maxSpeedMph * 0.7, speedLimitMph: 35, isHarsh: false },
+      { timestamp: Date.now(), lat: 37.7770, lng: -122.4160, speedMph: 0, speedLimitMph: 35, isHarsh: false }
+    ]
+  };
+
+  saveTrip(fullStoredTrip);
 
   const updatedAccount: UserAccount = {
     ...account,

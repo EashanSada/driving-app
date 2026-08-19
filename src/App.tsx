@@ -5,6 +5,9 @@ import { RiskAnalysisView } from './components/RiskAnalysisView';
 import { LeaderboardView } from './components/LeaderboardView';
 import { GamificationView } from './components/GamificationView';
 import { HazardMapView } from './components/HazardMapView';
+import { GdlTrackerView } from './components/GdlTrackerView';
+import { SupervisorCircleView } from './components/SupervisorCircleView';
+import { TripHistoryReplayModal } from './components/TripHistoryReplayModal';
 import { UserLoginModal } from './components/UserLoginModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { DatabaseStatusModal } from './components/DatabaseStatusModal';
@@ -61,7 +64,8 @@ export default function App() {
 
   const handleLoginSuccess = (username: string) => {
     setActiveUsernameState(username);
-    setActiveAccount(getAccount(username));
+    const acc = getAccount(username);
+    setActiveAccount(acc);
     setIsLoginModalOpen(false);
   };
 
@@ -84,13 +88,13 @@ export default function App() {
     if (activeUsername) {
       setActiveAccount(getAccount(activeUsername));
     }
-    // Switch to ML Risk Analysis view automatically on trip completion
+    // Switch to Risk Analysis view automatically on trip completion
     setActiveTab('analysis');
   };
 
   return (
     <div className="min-h-screen bg-transparent text-slate-100 flex flex-col font-sans selection:bg-[#2dd4bf] selection:text-slate-950">
-      {/* User Login Modal */}
+      {/* User Login & Questionnaire Modal */}
       <UserLoginModal
         isOpen={isLoginModalOpen}
         onLoginSuccess={handleLoginSuccess}
@@ -116,7 +120,7 @@ export default function App() {
         onClose={() => setIsDbModalOpen(false)}
       />
 
-      {/* Sticky Header */}
+      {/* Sticky Top Header */}
       <NavigationHeader
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -124,7 +128,6 @@ export default function App() {
         setLanguage={handleSetLanguage}
         unitSystem={unitSystem}
         setUnitSystem={setUnitSystem}
-        hasNativeBridge={hasNativeBridge}
         activeUsername={activeUsername}
         activeAccount={activeAccount}
         onOpenDbModal={() => setIsDbModalOpen(true)}
@@ -156,6 +159,18 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'trips' && (
+          <TripHistoryReplayModal
+            isOpen={true}
+            onClose={() => setActiveTab('hud')}
+            unitSystem={unitSystem}
+          />
+        )}
+
+        {activeTab === 'gdl' && <GdlTrackerView />}
+
+        {activeTab === 'supervisor' && <SupervisorCircleView unitSystem={unitSystem} />}
+
         {activeTab === 'leaderboard' && (
           <LeaderboardView onOpenLoginModal={() => setIsLoginModalOpen(true)} />
         )}
@@ -172,7 +187,11 @@ export default function App() {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-slate-300 text-[11px]">
             <span className="w-2 h-2 rounded-full bg-[#2dd4bf] animate-pulse" />
-            <span>DriveSafe Telematics • Active User: <strong className="text-white">{activeUsername || 'Guest'}</strong></span>
+            <span>
+              DriveSafe Telematics • Active User:{' '}
+              <strong className="text-white">{activeUsername || 'Guest'}</strong> (
+              {activeAccount?.role || 'Young Driver'})
+            </span>
           </div>
           <p className="font-medium text-[11px] text-slate-400">
             © {new Date().getFullYear()} DriveSafe Youth Initiative • Real Telematics & Safety Tracking.

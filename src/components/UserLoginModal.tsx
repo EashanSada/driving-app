@@ -1,6 +1,31 @@
 import React, { useState } from 'react';
-import { User, ShieldAlert, ArrowRight, CheckCircle2, Trophy, Phone, Mail, Users, ArrowLeft, Loader2 } from 'lucide-react';
-import { accountExists, createAccountAsync, fetchAccountFromSupabase, getAccount, getAllAccounts, setActiveUsername, UserAccount } from '../lib/accountManager';
+import {
+  User,
+  ShieldCheck,
+  ArrowRight,
+  CheckCircle2,
+  Trophy,
+  Phone,
+  Mail,
+  Users,
+  ArrowLeft,
+  Loader2,
+  Sparkles,
+  Volume2,
+  Zap,
+  Gauge,
+  GraduationCap
+} from 'lucide-react';
+import {
+  accountExists,
+  createAccountAsync,
+  fetchAccountFromSupabase,
+  getAccount,
+  getAllAccounts,
+  setActiveUsername,
+  UserAccount
+} from '../lib/accountManager';
+import { UserRole, UserPreferences } from '../types';
 
 interface UserLoginModalProps {
   isOpen: boolean;
@@ -15,24 +40,32 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
   onClose,
   allowCancel = false
 }) => {
-  const [step, setStep] = useState<'USERNAME' | 'REGISTER'>('USERNAME');
+  const [step, setStep] = useState<'LOGIN' | 'ROLE' | 'DETAILS' | 'PREFERENCES'>('LOGIN');
   const [usernameInput, setUsernameInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Registration Form State
+  // Registration Data
+  const [selectedRole, setSelectedRole] = useState<UserRole>('young_driver');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [licenseStage, setLicenseStage] = useState<'permit' | 'provisional' | 'full'>('permit');
   const [parentName, setParentName] = useState('');
   const [parentPhone, setParentPhone] = useState('');
   const [parentEmail, setParentEmail] = useState('');
+
+  // Preferences
+  const [voiceAlerts, setVoiceAlerts] = useState(true);
+  const [audioChimes, setAudioChimes] = useState(true);
+  const [autoTripDetect, setAutoTripDetect] = useState(true);
+  const [speedLimitOverlay, setSpeedLimitOverlay] = useState(true);
 
   const existingAccounts = getAllAccounts();
 
   if (!isOpen) return null;
 
-  const handleUsernameSubmit = async (e: React.FormEvent) => {
+  const handleLoginCheck = async (e: React.FormEvent) => {
     e.preventDefault();
     const clean = usernameInput.trim();
     if (!clean) {
@@ -48,12 +81,12 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
     setErrorMsg('');
 
     try {
-      // 1. Check Supabase cloud database first for cross-device sync
+      // 1. Check Supabase cloud database
       const cloudAccount = await fetchAccountFromSupabase(clean);
       if (cloudAccount) {
         setActiveUsername(clean);
         onLoginSuccess(clean);
-        resetModalState();
+        resetState();
         return;
       }
 
@@ -61,54 +94,44 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
       if (accountExists(clean)) {
         setActiveUsername(clean);
         onLoginSuccess(clean);
-        resetModalState();
+        resetState();
         return;
       }
 
-      // 3. New user: proceed to registration form
-      setStep('REGISTER');
+      // 3. New account: move to Role selection
+      setStep('ROLE');
     } catch (err) {
       console.error('Login submit check failed:', err);
-      setStep('REGISTER');
+      setStep('ROLE');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fullName.trim()) {
-      setErrorMsg('Please enter your full name.');
-      return;
-    }
-    if (!phone.trim()) {
-      setErrorMsg('Please enter your phone number.');
-      return;
-    }
-    if (!email.trim() || !email.includes('@')) {
-      setErrorMsg('Please enter a valid email address.');
-      return;
-    }
-    if (!parentName.trim()) {
-      setErrorMsg("Please enter parent / guardian's full name.");
-      return;
-    }
-    if (!parentPhone.trim()) {
-      setErrorMsg("Please enter parent / guardian's phone number.");
-      return;
-    }
-    if (!parentEmail.trim() || !parentEmail.includes('@')) {
-      setErrorMsg("Please enter a valid parent / guardian's email.");
-      return;
-    }
+  const handleQuickSelect = (username: string) => {
+    setActiveUsername(username);
+    onLoginSuccess(username);
+    resetState();
+  };
 
+  const handleFinishRegistration = async () => {
     setIsSubmitting(true);
     setErrorMsg('');
 
     try {
-      const { account: newAcc, syncResult } = await createAccountAsync({
+      const preferences: UserPreferences = {
+        audioVoiceAlerts: voiceAlerts,
+        audioChimes: audioChimes,
+        autoTripDetection: autoTripDetect,
+        speedLimitWarnings: speedLimitOverlay,
+        offlineSyncEnabled: true,
+        role: selectedRole,
+        gdlEnabled: selectedRole === 'gdl_student' || licenseStage === 'permit'
+      };
+
+      const result = await createAccountAsync({
         username: usernameInput.trim(),
-        fullName: fullName.trim(),
+        fullName: fullName.trim() || usernameInput.trim(),
         phone: phone.trim(),
         email: email.trim(),
         parentName: parentName.trim(),
@@ -116,28 +139,30 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
         parentEmail: parentEmail.trim()
       });
 
-      if (!syncResult.success) {
-        console.warn('Account saved locally, Supabase notice:', syncResult.message);
-      }
+      const updatedAccount: UserAccount = {
+        ...result.account,
+        role: selectedRole,
+        licenseStage,
+        preferences
+      };
 
-      onLoginSuccess(newAcc.username);
-      resetModalState();
-    } catch (err) {
-      console.error('Registration failed:', err);
-      setErrorMsg('Failed to create account. Please try again.');
+      // Re-save with preferences
+      localStorage.setItem('drivesafe_active_username_v2', updatedAccount.username);
+      const allMap = JSON.parse(localStorage.getItem('drivesafe_accounts_map_v2') || '{}');
+      allMap[updatedAccount.username.toLowerCase()] = updatedAccount;
+      localStorage.setItem('drivesafe_accounts_map_v2', JSON.stringify(allMap));
+
+      onLoginSuccess(updatedAccount.username);
+      resetState();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to create account. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleSelectExisting = (acc: UserAccount) => {
-    setActiveUsername(acc.username);
-    onLoginSuccess(acc.username);
-    resetModalState();
-  };
-
-  const resetModalState = () => {
-    setStep('USERNAME');
+  const resetState = () => {
+    setStep('LOGIN');
     setUsernameInput('');
     setErrorMsg('');
     setFullName('');
@@ -149,273 +174,393 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-fade-in overflow-y-auto">
-      <div className="glass-card max-w-lg w-full p-6 border border-[#2dd4bf]/30 shadow-2xl relative my-8 overflow-hidden">
-        <div className="absolute -right-12 -top-12 w-48 h-48 bg-[#2dd4bf]/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -left-12 -bottom-12 w-48 h-48 bg-[#a78bfa]/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="glass-card max-w-lg w-full p-6 md:p-8 border border-[#2dd4bf]/30 shadow-2xl relative overflow-hidden">
+        <div className="absolute -right-20 -top-20 w-48 h-48 bg-[#2dd4bf]/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 space-y-6">
-          {/* Header */}
-          <div className="text-center space-y-2">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#2dd4bf] to-[#a78bfa] p-0.5 mx-auto shadow-lg glow-mint flex items-center justify-center">
-              <div className="w-full h-full bg-[#020617] rounded-[14px] flex items-center justify-center">
-                <ShieldAlert className="w-6 h-6 text-[#2dd4bf]" />
+        {/* Step 1: Login / Start */}
+        {step === 'LOGIN' && (
+          <div className="space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-12 h-12 rounded-2xl bg-[#2dd4bf]/10 border border-[#2dd4bf]/30 mx-auto flex items-center justify-center shadow-lg">
+                <ShieldCheck className="w-6 h-6 text-[#2dd4bf]" />
               </div>
+              <h2 className="text-xl font-extrabold text-white font-display">Driver Portal Sign In</h2>
+              <p className="text-xs text-slate-300">
+                Enter your username to access your telemetry scores, trip history, and safety goals.
+              </p>
             </div>
-            <h2 className="text-2xl font-black tracking-tight text-white font-display">
-              {step === 'USERNAME' ? (
-                <>DRIVESAFE <span className="text-[#2dd4bf]">ACCOUNT LOGIN</span></>
-              ) : (
-                <>NEW DRIVER <span className="text-[#2dd4bf]">REGISTRATION</span></>
-              )}
-            </h2>
-            <p className="text-xs text-slate-300">
-              {step === 'USERNAME'
-                ? 'Enter your username. Existing accounts log in instantly; new usernames register below.'
-                : `Complete real driver and parent verification for @${usernameInput.trim()}`}
-            </p>
-          </div>
 
-          {/* STEP 1: Enter Username */}
-          {step === 'USERNAME' && (
-            <div className="space-y-6">
-              <form onSubmit={handleUsernameSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                    Enter Username
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                      <User className="w-4 h-4 text-[#2dd4bf]" />
-                    </div>
-                    <input
-                      type="text"
-                      value={usernameInput}
-                      onChange={(e) => {
-                        setUsernameInput(e.target.value);
-                        setErrorMsg('');
-                      }}
-                      placeholder="e.g. AlexDriver, JordanKey, Sam99..."
-                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#020617]/90 border border-white/20 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-[#2dd4bf] focus:ring-1 focus:ring-[#2dd4bf] transition-all font-medium"
-                      autoFocus
-                    />
-                  </div>
-                  {errorMsg && (
-                    <p className="text-xs text-rose-400 font-semibold mt-1.5">{errorMsg}</p>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#38bdf8] text-slate-950 font-extrabold text-sm hover:shadow-lg transition-all cursor-pointer glow-mint flex items-center justify-center gap-2 disabled:opacity-60"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Checking Account...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Continue</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </form>
-
-              {/* Saved Accounts List */}
-              {existingAccounts.length > 0 && (
-                <div className="space-y-2 pt-3 border-t border-white/10">
-                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Registered Accounts on this Device
-                  </span>
-                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                    {existingAccounts.map((acc) => (
-                      <button
-                        key={acc.username}
-                        onClick={() => handleSelectExisting(acc)}
-                        className="w-full p-2.5 rounded-xl bg-[#020617]/60 hover:bg-slate-800/60 border border-white/10 hover:border-[#2dd4bf]/40 flex items-center justify-between text-left transition-all cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-[#2dd4bf]/20 text-[#2dd4bf] font-bold text-xs flex items-center justify-center border border-[#2dd4bf]/40">
-                            {acc.username.substring(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="text-xs font-bold text-white flex items-center gap-2">
-                              <span>{acc.username}</span>
-                              {acc.fullName && acc.fullName !== acc.username && (
-                                <span className="text-[10px] font-normal text-slate-400">({acc.fullName})</span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-slate-400">
-                              {acc.totalTrips} Trips • {acc.totalDistanceMiles.toFixed(1)} mi
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-[#2dd4bf]">
-                          <Trophy className="w-3.5 h-3.5 text-[#2dd4bf]" />
-                          <span>{acc.safetyScore} pts</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* STEP 2: Registration Form */}
-          {step === 'REGISTER' && (
-            <form onSubmit={handleRegisterSubmit} className="space-y-4 text-left">
-              <div className="p-3 rounded-xl bg-[#2dd4bf]/10 border border-[#2dd4bf]/30 text-xs text-[#2dd4bf] flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>
-                  New username <strong>@{usernameInput.trim()}</strong>. Please enter your real driver and parent details to complete setup.
-                </span>
+            {errorMsg && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium">
+                {errorMsg}
               </div>
+            )}
 
-              {/* Driver Section */}
-              <div className="space-y-3">
-                <div className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5 border-b border-white/10 pb-1">
-                  <User className="w-3.5 h-3.5 text-[#2dd4bf]" /> Driver Details
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                    Driver's Full Name *
-                  </label>
+            <form onSubmit={handleLoginCheck} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-200 mb-1.5 uppercase tracking-wider">
+                  Username
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Alex Johnson"
-                    className="w-full px-3 py-2 rounded-lg bg-[#020617]/90 border border-white/20 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-[#2dd4bf]"
+                    value={usernameInput}
+                    onChange={(e) => setUsernameInput(e.target.value)}
+                    placeholder="e.g. alex_rivera"
+                    autoFocus
                     required
+                    className="w-full bg-[#020617] border border-white/15 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-[#2dd4bf] transition-all"
                   />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                      Driver's Phone *
-                    </label>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="(555) 012-3456"
-                      className="w-full px-3 py-2 rounded-lg bg-[#020617]/90 border border-white/20 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-[#2dd4bf]"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                      Driver's Email *
-                    </label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="driver@example.com"
-                      className="w-full px-3 py-2 rounded-lg bg-[#020617]/90 border border-white/20 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-[#2dd4bf]"
-                      required
-                    />
-                  </div>
                 </div>
               </div>
 
-              {/* Parent Section */}
-              <div className="space-y-3 pt-2">
-                <div className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5 border-b border-white/10 pb-1">
-                  <Users className="w-3.5 h-3.5 text-[#a78bfa]" /> Parent / Guardian Details
-                </div>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#a78bfa] text-slate-950 font-extrabold text-xs uppercase tracking-wider hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Connecting Profile...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Continue to DriveSafe</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
 
+            {/* Quick Switch from local storage */}
+            {existingAccounts.length > 0 && (
+              <div className="pt-4 border-t border-white/10 space-y-2">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  Switch Active Local Driver
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {existingAccounts.map((acc) => (
+                    <button
+                      key={acc.username}
+                      type="button"
+                      onClick={() => handleQuickSelect(acc.username)}
+                      className="px-3 py-1.5 rounded-lg bg-[#020617] border border-white/10 hover:border-[#2dd4bf]/50 text-xs text-slate-200 hover:text-white transition-all flex items-center gap-2"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-[#2dd4bf]" />
+                      <span className="font-bold">{acc.username}</span>
+                      <span className="text-[10px] text-[#2dd4bf] font-mono">({acc.safetyScore} pts)</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {allowCancel && onClose && (
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  Continue in Anonymous Guest Mode
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Step 2: Role Selection */}
+        {step === 'ROLE' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setStep('LOGIN')}
+                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back
+              </button>
+              <span className="text-[11px] font-mono text-[#2dd4bf]">Step 1 of 3</span>
+            </div>
+
+            <div className="text-center space-y-1">
+              <h2 className="text-lg font-extrabold text-white font-display">Select Your Primary Role</h2>
+              <p className="text-xs text-slate-300">
+                DriveSafe adapts its tools so your interface remains clean and relevant.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                {
+                  id: 'young_driver' as UserRole,
+                  title: 'Young Driver',
+                  desc: 'Track trip smoothness, speed adherence, and insurance discount scores.',
+                  icon: Gauge
+                },
+                {
+                  id: 'gdl_student' as UserRole,
+                  title: 'GDL Permit Student',
+                  desc: 'Log mandatory 50 day/night supervised driving hours for state licensing.',
+                  icon: GraduationCap
+                },
+                {
+                  id: 'parent_mentor' as UserRole,
+                  title: 'Parent / Mentor',
+                  desc: 'Review safety scores, export PDF driver reports, and supervise sessions.',
+                  icon: Users
+                },
+                {
+                  id: 'driving_instructor' as UserRole,
+                  title: 'Instructor / School',
+                  desc: 'Manage student cohorts and evaluate telematics safety ratings.',
+                  icon: Trophy
+                }
+              ].map((role) => {
+                const Icon = role.icon;
+                const isSelected = selectedRole === role.id;
+                return (
+                  <button
+                    key={role.id}
+                    type="button"
+                    onClick={() => setSelectedRole(role.id)}
+                    className={`p-4 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
+                      isSelected
+                        ? 'bg-[#2dd4bf]/15 border-[#2dd4bf] text-white shadow-lg'
+                        : 'bg-[#020617]/70 border-white/10 text-slate-300 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <Icon className={`w-5 h-5 ${isSelected ? 'text-[#2dd4bf]' : 'text-slate-400'}`} />
+                      {isSelected && <CheckCircle2 className="w-4 h-4 text-[#2dd4bf]" />}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">{role.title}</div>
+                      <div className="text-[11px] text-slate-400 leading-snug mt-1">{role.desc}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setStep('DETAILS')}
+              className="w-full py-3 px-4 rounded-xl bg-[#2dd4bf] text-slate-950 font-extrabold text-xs uppercase tracking-wider hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              <span>Next: Driver Profile</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Step 3: Profile Details & Licensing */}
+        {step === 'DETAILS' && (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setStep('ROLE')}
+                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back
+              </button>
+              <span className="text-[11px] font-mono text-[#2dd4bf]">Step 2 of 3</span>
+            </div>
+
+            <div className="text-center space-y-1">
+              <h2 className="text-lg font-extrabold text-white font-display">Driver Information</h2>
+              <p className="text-xs text-slate-300">Set up your profile for {usernameInput}</p>
+            </div>
+
+            <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase">Full Name</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g. Jordan Miller"
+                  className="w-full bg-[#020617] border border-white/15 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                    Parent / Guardian Full Name *
-                  </label>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase">Phone</label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="(555) 000-0000"
+                    className="w-full bg-[#020617] border border-white/15 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase">Email</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="driver@example.com"
+                    className="w-full bg-[#020617] border border-white/15 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1 uppercase">Licensing Stage</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'permit', label: "Learner's Permit" },
+                    { id: 'provisional', label: 'Provisional' },
+                    { id: 'full', label: 'Full License' }
+                  ].map((stage) => (
+                    <button
+                      key={stage.id}
+                      type="button"
+                      onClick={() => setLicenseStage(stage.id as any)}
+                      className={`p-2 rounded-lg text-center text-xs font-bold border transition-all cursor-pointer ${
+                        licenseStage === stage.id
+                          ? 'bg-[#2dd4bf]/20 border-[#2dd4bf] text-[#2dd4bf]'
+                          : 'bg-[#020617] border-white/10 text-slate-400'
+                      }`}
+                    >
+                      {stage.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-white/10">
+                <span className="text-[11px] font-bold text-slate-300 block mb-2 uppercase">
+                  Parent / Mentor Contact (Optional)
+                </span>
+                <div className="grid grid-cols-2 gap-2">
                   <input
                     type="text"
                     value={parentName}
                     onChange={(e) => setParentName(e.target.value)}
-                    placeholder="e.g. Sarah Johnson"
-                    className="w-full px-3 py-2 rounded-lg bg-[#020617]/90 border border-white/20 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-[#a78bfa]"
-                    required
+                    placeholder="Mentor Name"
+                    className="bg-[#020617] border border-white/15 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
+                  />
+                  <input
+                    type="email"
+                    value={parentEmail}
+                    onChange={(e) => setParentEmail(e.target.value)}
+                    placeholder="mentor@example.com"
+                    className="bg-[#020617] border border-white/15 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
                   />
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                      Parent's Phone *
-                    </label>
-                    <input
-                      type="tel"
-                      value={parentPhone}
-                      onChange={(e) => setParentPhone(e.target.value)}
-                      placeholder="(555) 987-6543"
-                      className="w-full px-3 py-2 rounded-lg bg-[#020617]/90 border border-white/20 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-[#a78bfa]"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                      Parent's Email *
-                    </label>
-                    <input
-                      type="email"
-                      value={parentEmail}
-                      onChange={(e) => setParentEmail(e.target.value)}
-                      placeholder="parent@example.com"
-                      className="w-full px-3 py-2 rounded-lg bg-[#020617]/90 border border-white/20 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-[#a78bfa]"
-                      required
-                    />
-                  </div>
-                </div>
               </div>
+            </div>
 
-              {errorMsg && (
-                <p className="text-xs text-rose-400 font-semibold">{errorMsg}</p>
-              )}
-
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setStep('USERNAME')}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-700 transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Back</span>
-                </button>
-
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#38bdf8] text-slate-950 font-extrabold text-xs hover:shadow-lg transition-all cursor-pointer glow-mint flex items-center justify-center gap-1.5"
-                >
-                  <span>Complete Account Registration</span>
-                  <CheckCircle2 className="w-4 h-4" />
-                </button>
-              </div>
-            </form>
-          )}
-
-          {allowCancel && onClose && (
             <button
               type="button"
-              onClick={() => {
-                resetModalState();
-                onClose();
-              }}
-              className="w-full text-center text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors pt-2"
+              onClick={() => setStep('PREFERENCES')}
+              className="w-full py-3 px-4 rounded-xl bg-[#2dd4bf] text-slate-950 font-extrabold text-xs uppercase tracking-wider hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
             >
-              Cancel
+              <span>Next: Safety Assist Preferences</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Step 4: Safety Assist Preferences */}
+        {step === 'PREFERENCES' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setStep('DETAILS')}
+                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back
+              </button>
+              <span className="text-[11px] font-mono text-[#2dd4bf]">Step 3 of 3</span>
+            </div>
+
+            <div className="text-center space-y-1">
+              <h2 className="text-lg font-extrabold text-white font-display">Safety Assist Preferences</h2>
+              <p className="text-xs text-slate-300">Enable features tailored to your driving environment.</p>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                {
+                  label: 'Audio Voice Alerts',
+                  desc: 'Clear spoken safety notices when sudden braking or sharp cornering occurs.',
+                  checked: voiceAlerts,
+                  toggle: () => setVoiceAlerts(!voiceAlerts),
+                  icon: Volume2
+                },
+                {
+                  label: 'Motion Auto-Start & Auto-Stop',
+                  desc: 'Automatically begins trip recording when driving and concludes when parked.',
+                  checked: autoTripDetect,
+                  toggle: () => setAutoTripDetect(!autoTripDetect),
+                  icon: Zap
+                },
+                {
+                  label: 'Posted Speed Limit Advisory',
+                  desc: 'Real-time road speed limit comparison and caution alerts.',
+                  checked: speedLimitOverlay,
+                  toggle: () => setSpeedLimitOverlay(!speedLimitOverlay),
+                  icon: Gauge
+                }
+              ].map((pref, idx) => {
+                const Icon = pref.icon;
+                return (
+                  <div
+                    key={idx}
+                    onClick={pref.toggle}
+                    className="p-3.5 rounded-xl bg-[#020617]/70 border border-white/10 flex items-center justify-between cursor-pointer hover:border-[#2dd4bf]/40 transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-white/5">
+                        <Icon className="w-4 h-4 text-[#2dd4bf]" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white">{pref.label}</div>
+                        <div className="text-[11px] text-slate-400 leading-snug">{pref.desc}</div>
+                      </div>
+                    </div>
+                    <div
+                      className={`w-10 h-6 rounded-full transition-colors relative flex items-center px-1 ${
+                        pref.checked ? 'bg-[#2dd4bf]' : 'bg-slate-800'
+                      }`}
+                    >
+                      <div
+                        className={`w-4 h-4 rounded-full bg-slate-950 transition-transform ${
+                          pref.checked ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleFinishRegistration}
+              disabled={isSubmitting}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#a78bfa] text-slate-950 font-extrabold text-xs uppercase tracking-wider hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Saving Profile...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Complete Setup & Open DriveSafe</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
