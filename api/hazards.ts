@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { applySecurityHeaders, enforceRateLimit, sanitizeString, sanitizeCoordinates } from './_security';
 
 function getSupabaseServerClient(req?: any) {
   const headerUrl = req?.headers?.['x-supabase-url'] || req?.headers?.['authorization-url'];
@@ -32,12 +33,19 @@ function getSupabaseServerClient(req?: any) {
 }
 
 export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-supabase-url, x-supabase-key');
+  applySecurityHeaders(res);
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  // Rate Limiting (40 requests per minute per IP)
+  const rateLimitCheck = enforceRateLimit(req, 'hazards', 40, 60 * 1000);
+  if (!rateLimitCheck.allowed) {
+    return res.status(rateLimitCheck.statusCode || 429).json({
+      status: 'error',
+      message: rateLimitCheck.message
+    });
   }
 
   const supabase = getSupabaseServerClient(req);
@@ -51,7 +59,8 @@ export default async function handler(req: any, res: any) {
       const { data, error } = await supabase
         .from('road_hazards')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) {
         return res.status(500).json({ status: 'error', message: error.message });
@@ -75,9 +84,14 @@ export default async function handler(req: any, res: any) {
   }
 
   if (req.method === 'POST') {
-    const report = req.body || {};
-    if (!report.id || !report.hazard_type || !report.description) {
-      return res.status(400).json({ status: 'error', message: 'Invalid hazard payload' });
+    const raw = req.body || {};
+    const cleanId = sanitizeString(raw.id || `hz_${Date.now()}`, 50);
+    const cleanType = sanitizeString(raw.hazard_type || 'POTHOLE', 30);
+    const cleanDesc = sanitizeString(raw.description || '', 200);
+    const coords = sanitizeCoordinates(raw.lat, raw.lng);
+
+    if (!cleanType || !cleanDesc || !coords) {
+      return res.status(400).json({ status: 'error', message: 'Invalid hazard payload or coordinates' });
     }
 
     if (!supabase) {
@@ -86,45 +100,51 @@ export default async function handler(req: any, res: any) {
 
     try {
       const { error } = await supabase.from('road_hazards').insert({
-        id: report.id,
-        hazard_type: report.hazard_type,
-        description: report.description,
-        lat: Number(report.lat),
-        lng: Number(report.lng),
-        upvotes: Number(report.upvotes) || 1,
-        source_app: report.source_app || 'WEB_APP'
+        id: cleanId,
+        hazard_type: cleanType,
+        description: cleanDesc,
+        lat: coords.lat,
+        lng: coords.lng,
+        upvotes: Math.max(1, Math.min(1000, Number(raw.upvotes) || 1)),
+        source_app: sanitizeString(raw.source_app || 'WEB_APP', 20)
       });
 
       if (error) {
         return res.status(500).json({ status: 'error', supabaseSaved: false, message: error.message });
       }
 
-      return res.status(200).json({ status: 'success', report, supabaseSaved: true });
+      return res.status(200).json({ status: 'success', supabaseSaved: true, hazardId: cleanId });
     } catch (err: any) {
-      return res.status(500).json({ status: 'error', supabaseSaved: false, message: err.message });
+      return res.status(500).json({ status: 'error', supabaseSaved: false, message: err.message || 'Insert error' });
     }
   }
 
   if (req.method === 'PUT') {
-    const { id } = req.body || {};
-    if (!id) return res.status(400).json({ status: 'error', message: 'ID required' });
+    const raw = req.body || {};
+    const cleanId = sanitizeString(raw.id, 50);
+    const upvotes = Number(raw.upvotes);
+
+    if (!cleanId || isNaN(upvotes)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid upvote payload' });
+    }
 
     if (!supabase) {
-      return res.status(503).json({ status: 'error', message: 'Supabase client not initialized' });
+      return res.status(503).json({ status: 'error', supabaseSaved: false, message: 'Supabase not configured' });
     }
 
     try {
-      const { data: existing } = await supabase.from('road_hazards').select('upvotes').eq('id', id).single();
-      const currentUpvotes = existing ? (existing.upvotes || 1) + 1 : 2;
+      const { error } = await supabase
+        .from('road_hazards')
+        .update({ upvotes: Math.max(1, Math.min(10000, upvotes)) })
+        .eq('id', cleanId);
 
-      const { error } = await supabase.from('road_hazards').update({ upvotes: currentUpvotes }).eq('id', id);
       if (error) {
         return res.status(500).json({ status: 'error', message: error.message });
       }
 
-      return res.status(200).json({ status: 'success', id, upvotes: currentUpvotes });
+      return res.status(200).json({ status: 'success', supabaseSaved: true });
     } catch (err: any) {
-      return res.status(500).json({ status: 'error', message: err.message });
+      return res.status(500).json({ status: 'error', message: err.message || 'Update error' });
     }
   }
 

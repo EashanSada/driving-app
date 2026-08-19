@@ -1,1 +1,79 @@
 @import "tailwindcss";
+
+:root {
+  --bg: #020617;
+  --slate: #0f172a;
+  --mint: #2dd4bf;
+  --mint-glow: rgba(45, 212, 191, 0.35);
+  --violet: #a78bfa;
+  --violet-glow: rgba(167, 139, 250, 0.35);
+  --glass: rgba(15, 23, 42, 0.75);
+  --border: rgba(255, 255, 255, 0.1);
+}
+
+body {
+  background-color: var(--bg);
+  background-image: 
+    radial-gradient(circle at 10% 10%, #1e1b4b 0%, transparent 45%),
+    radial-gradient(circle at 90% 90%, #134e4a 0%, transparent 45%);
+  background-attachment: fixed;
+  color: #f8fafc;
+  font-family: 'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow-x: hidden;
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* Frosted Glass Container */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+}
+
+.glass-card {
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(45, 212, 191, 0.35);
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5), 0 0 25px var(--mint-glow);
+}
+
+.card-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--violet);
+  margin-bottom: 8px;
+}
+
+.glow-mint {
+  box-shadow: 0 0 25px rgba(45, 212, 191, 0.3);
+}
+
+.glow-violet {
+  box-shadow: 0 0 25px rgba(167, 139, 250, 0.3);
+}
+
+.hud-circle {
+  width: 270px;
+  height: 270px;
+  border-radius: 50%;
+  border: 2px solid rgba(45, 212, 191, 0.3);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, rgba(45, 212, 191, 0.1) 0%, transparent 70%);
+  box-shadow: 0 0 35px rgba(45, 212, 191, 0.15);
+}

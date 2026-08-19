@@ -1,24 +1,48 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
+import { applySecurityHeaders, isMaliciousUserAgent } from "./api/_security";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: "5mb" }));
+  // Security: Remove Express fingerprinting header
+  app.disable('x-powered-by');
 
-  // Initialize Gemini AI Client lazily/safely
-  const getGeminiClient = () => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return null;
+  // Security: Restrict payload body to prevent RAM exhaustion attacks
+  app.use(express.json({ limit: "500kb" }));
+
+  // Global Security Firewall Middleware
+  app.use((req, res, next) => {
+    // 1. Apply Defense-in-Depth HTTP Security Headers
+    applySecurityHeaders(res);
+
+    // 2. Block Known Malicious Scanners & Exploit Probes
+    if (isMaliciousUserAgent(req)) {
+      return res.status(403).json({
+        status: "error",
+        message: "Access Forbidden: Suspicious client signature detected."
+      });
     }
-    return new GoogleGenAI({
-      apiKey
-    });
-  };
+
+    // 3. Block directory traversal and sensitive config access attempts
+    const url = req.url.toLowerCase();
+    if (
+      url.includes('/.env') ||
+      url.includes('/.git') ||
+      url.includes('/wp-admin') ||
+      url.includes('/.aws') ||
+      url.includes('..')
+    ) {
+      return res.status(403).json({
+        status: "error",
+        message: "Forbidden access path."
+      });
+    }
+
+    next();
+  });
 
   // 1. Python-Equivalent Serverless ML Risk Analyzer Endpoint
   app.all("/api/analyze-risk", async (req, res) => {
@@ -76,7 +100,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`DriveSafe Youth Platform running on http://0.0.0.0:${PORT}`);
+    console.log(`DriveSafe Youth Platform running securely on http://0.0.0.0:${PORT}`);
   });
 }
 

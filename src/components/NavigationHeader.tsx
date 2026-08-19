@@ -31,11 +31,11 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
   onOpenLoginModal,
   onOpenDbModal
 }) => {
-  const languageNames: Record<LanguageCode, { label: string; flag: string }> = {
-    en: { label: 'English', flag: '🇺🇸' },
-    es: { label: 'Español', flag: '🇪🇸' },
-    fr: { label: 'Français', flag: '🇫🇷' },
-    zh: { label: '中文 (Mandarin)', flag: '🇨🇳' }
+  const languageNames: Record<LanguageCode, { label: string; code: string }> = {
+    en: { label: 'English', code: 'EN' },
+    es: { label: 'Español', code: 'ES' },
+    fr: { label: 'Français', code: 'FR' },
+    zh: { label: 'Mandarin', code: 'ZH' }
   };
 
   const navItems: { id: NavTab; key: Parameters<typeof t>[0]; icon: React.ReactNode }[] = [

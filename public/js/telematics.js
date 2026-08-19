@@ -361,8 +361,12 @@ class TelematicsEngine {
     };
   }
 
-  // High-performance Canvas Render Loop for G-Force Radar HUD
+  // High-performance Canvas Render Loop for Fun Smooth Drive Radar
   startHudAnimationLoop() {
+    this.radarAngle = 0;
+    this.smoothPx = null;
+    this.smoothPy = null;
+
     const render = () => {
       this.drawHudCanvas();
       requestAnimationFrame(render);
@@ -377,79 +381,134 @@ class TelematicsEngine {
     const height = this.canvas.height;
     const cx = width / 2;
     const cy = height / 2;
-    const maxRadius = Math.min(width, height) / 2 - 15;
+    const maxRadius = Math.min(width, height) / 2 - 14;
 
     const ctx = this.ctx;
     ctx.clearRect(0, 0, width, height);
 
-    // 1. Outer Tech Frame
+    this.radarAngle = ((this.radarAngle || 0) + 0.03) % (Math.PI * 2);
+
+    // 1. Dark Futuristic Background Disc
+    const bgGradient = ctx.createRadialGradient(cx, cy, 10, cx, cy, maxRadius);
+    bgGradient.addColorStop(0, '#090d16');
+    bgGradient.addColorStop(1, '#020617');
+    ctx.fillStyle = bgGradient;
     ctx.beginPath();
     ctx.arc(cx, cy, maxRadius, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.fill();
+
+    // 2. Outer Smooth Rings with Friendly Zones
+    const ringChill = maxRadius * 0.35;    // Chill Zone (< 0.35 G)
+    const ringCruising = maxRadius * 0.70; // Cruising Zone (< 0.70 G)
+    const ringLimit = maxRadius;           // Outer Limit
+
+    // Animated Rotating Radar Sweeper
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, maxRadius, this.radarAngle, this.radarAngle + 0.35);
+    ctx.closePath();
+    const sweepGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxRadius);
+    sweepGrad.addColorStop(0, 'rgba(45, 212, 191, 0.0)');
+    sweepGrad.addColorStop(1, 'rgba(45, 212, 191, 0.12)');
+    ctx.fillStyle = sweepGrad;
+    ctx.fill();
+    ctx.restore();
+
+    // Zone 1: The Chill Zone (Mint Green)
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringChill, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.05)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(45, 212, 191, 0.4)';
+    ctx.setLineDash([3, 4]);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Zone 2: Steady Zone (Violet)
+    ctx.beginPath();
+    ctx.arc(cx, cy, ringCruising, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(167, 139, 250, 0.03)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(167, 139, 250, 0.3)';
+    ctx.setLineDash([4, 4]);
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // 2. Safe / Moderate / Critical Target Rings
-    const ring05 = maxRadius * 0.33; // 0.5 G
-    const ring10 = maxRadius * 0.66; // 1.0 G
-    const ring15 = maxRadius * 1.0;  // 1.5 G
-
-    // 0.5G Ring (Safe Green)
+    // Zone 3: Outer Border (Rose)
     ctx.beginPath();
-    ctx.arc(cx, cy, ring05, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.3)';
-    ctx.setLineDash([4, 4]);
-    ctx.stroke();
-
-    // 1.0G Ring (Amber Warning)
-    ctx.beginPath();
-    ctx.arc(cx, cy, ring10, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
-    ctx.stroke();
-
-    // 1.5G Ring (Red Hazard)
-    ctx.beginPath();
-    ctx.arc(cx, cy, ring15, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+    ctx.arc(cx, cy, ringLimit, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(244, 63, 94, 0.35)';
     ctx.setLineDash([]);
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // 3. Crosshairs
+    // 3. Compass Crosshairs
     ctx.beginPath();
-    ctx.moveTo(cx - maxRadius, cy);
-    ctx.lineTo(cx + maxRadius, cy);
-    ctx.moveTo(cx, cy - maxRadius);
-    ctx.lineTo(cx, cy + maxRadius);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.moveTo(cx - maxRadius + 6, cy);
+    ctx.lineTo(cx + maxRadius - 6, cy);
+    ctx.moveTo(cx, cy - maxRadius + 6);
+    ctx.lineTo(cx, cy + maxRadius - 6);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.lineWidth = 1;
     ctx.stroke();
 
-    // 4. Ring Labels
+    // 4. Directional Helpers (Clear, High-Precision Markers)
     ctx.fillStyle = '#64748b';
-    ctx.font = '10px sans-serif';
-    ctx.fillText('0.5G', cx + 4, cy - ring05 + 12);
-    ctx.fillText('1.0G', cx + 4, cy - ring10 + 12);
+    ctx.font = '600 9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('ACCEL', cx, cy - maxRadius + 8);
+    ctx.fillText('BRAKE', cx, cy + maxRadius - 8);
+    ctx.fillText('LEFT', cx - maxRadius + 18, cy);
+    ctx.fillText('RIGHT', cx + maxRadius - 18, cy);
 
-    // 5. Calculate Vector Dot Position (X = Lateral, Y = Longitudinal)
-    const px = cx + (this.state.gForceX / 1.5) * maxRadius;
-    const py = cy - (this.state.gForceY / 1.5) * maxRadius;
+    // 5. Target Position Calculation with Smooth Interpolation
+    const targetPx = cx + (this.state.gForceX / 1.2) * maxRadius;
+    const targetPy = cy - (this.state.gForceY / 1.2) * maxRadius;
 
-    // Glowing Trail Line
+    if (this.smoothPx === null) {
+      this.smoothPx = targetPx;
+      this.smoothPy = targetPy;
+    } else {
+      this.smoothPx += (targetPx - this.smoothPx) * 0.25;
+      this.smoothPy += (targetPy - this.smoothPy) * 0.25;
+    }
+
+    // Dynamic State Colors
+    const isHarsh = this.state.gForceMag > 0.6;
+    const isMedium = this.state.gForceMag > 0.3;
+    const beaconColor = isHarsh ? '#f43f5e' : (isMedium ? '#a78bfa' : '#2dd4bf');
+
+    // Vector Trail from Center
     ctx.beginPath();
     ctx.moveTo(cx, cy);
-    ctx.lineTo(px, py);
-    const dotColor = this.state.gForceMag > 0.5 ? '#ef4444' : (this.state.gForceMag > 0.3 ? '#f59e0b' : '#10b981');
-    ctx.strokeStyle = dotColor;
+    ctx.lineTo(this.smoothPx, this.smoothPy);
+    ctx.strokeStyle = beaconColor;
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Glowing Dot
+    // Center Anchor
     ctx.beginPath();
-    ctx.arc(px, py, 8, 0, Math.PI * 2);
-    ctx.fillStyle = dotColor;
-    ctx.shadowColor = dotColor;
-    ctx.shadowBlur = 12;
+    ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#2dd4bf';
     ctx.fill();
-    ctx.shadowBlur = 0; // Reset
+
+    // Outer Position Beacon Halo
+    const pulseSize = 10 + Math.sin(Date.now() / 250) * 2;
+    ctx.beginPath();
+    ctx.arc(this.smoothPx, this.smoothPy, pulseSize, 0, Math.PI * 2);
+    ctx.fillStyle = isHarsh ? 'rgba(244, 63, 94, 0.2)' : (isMedium ? 'rgba(167, 139, 250, 0.2)' : 'rgba(45, 212, 191, 0.2)');
+    ctx.fill();
+
+    // Core Position Beacon
+    ctx.beginPath();
+    ctx.arc(this.smoothPx, this.smoothPy, 6, 0, Math.PI * 2);
+    ctx.fillStyle = beaconColor;
+    ctx.shadowColor = beaconColor;
+    ctx.shadowBlur = 10;
+    ctx.fill();
+    ctx.shadowBlur = 0; // Reset shadow
   }
 }
 

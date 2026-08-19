@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { applySecurityHeaders, enforceRateLimit, sanitizeString, maskPiiAccount } from './_security';
 
 function getSupabaseServerClient(req?: any) {
   // Check request headers first (passed from frontend if configured in UI), then process.env
@@ -38,13 +39,19 @@ function getSupabaseServerClient(req?: any) {
 }
 
 export default async function handler(req: any, res: any) {
-  // Support CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-supabase-url, x-supabase-key');
+  applySecurityHeaders(res);
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  // Rate Limiting (60 requests per minute per IP)
+  const rateLimitCheck = enforceRateLimit(req, 'accounts', 60, 60 * 1000);
+  if (!rateLimitCheck.allowed) {
+    return res.status(rateLimitCheck.statusCode || 429).json({
+      status: 'error',
+      message: rateLimitCheck.message
+    });
   }
 
   const { client: supabase, url: envUrl, error: clientErr } = getSupabaseServerClient(req);
@@ -88,7 +95,6 @@ export default async function handler(req: any, res: any) {
       let writeSuccess = !writeErr;
 
       if (writeErr) {
-        // Fallback write check
         const { error: insertErr } = await supabase.from('driver_accounts').insert(testPayload);
         if (!insertErr) writeSuccess = true;
       }
@@ -127,7 +133,7 @@ export default async function handler(req: any, res: any) {
     }
 
     if (username) {
-      const cleanName = String(username).trim().toLowerCase();
+      const cleanName = sanitizeString(username, 50).toLowerCase();
 
       try {
         const { data, error } = await supabase
@@ -172,7 +178,7 @@ export default async function handler(req: any, res: any) {
         return res.status(500).json({ status: 'error', message: err.message || 'Supabase exception' });
       }
     } else {
-      // Return all accounts directly from Supabase
+      // Return all accounts directly from Supabase (Mask sensitive PII for public leaderboard)
       try {
         const { data, error } = await supabase
           .from('driver_accounts')
@@ -186,25 +192,28 @@ export default async function handler(req: any, res: any) {
           });
         }
 
-        const accounts = (data || []).map((item: any) => item.account_data || {
-          username: item.username,
-          fullName: item.full_name,
-          phone: item.phone,
-          email: item.email,
-          parentName: item.parent_name,
-          parentPhone: item.parent_phone,
-          parentEmail: item.parent_email,
-          createdTime: item.created_time || Date.now(),
-          safetyScore: Number(item.safety_score) || 100,
-          cleanTrips: Number(item.clean_trips) || 0,
-          totalTrips: Number(item.total_trips) || 0,
-          totalDistanceMiles: Number(item.total_distance_miles) || 0,
-          points: Number(item.points) || 0,
-          level: Number(item.level) || 1,
-          currentXp: Number(item.current_xp) || 0,
-          nextLevelXp: Number(item.next_level_xp) || 1000,
-          badgesUnlocked: item.badges_unlocked || ['BRONZE_GUARDIAN'],
-          tripHistory: item.trip_history || []
+        const accounts = (data || []).map((item: any) => {
+          const raw = item.account_data || {
+            username: item.username,
+            fullName: item.full_name,
+            phone: item.phone,
+            email: item.email,
+            parentName: item.parent_name,
+            parentPhone: item.parent_phone,
+            parentEmail: item.parent_email,
+            createdTime: item.created_time || Date.now(),
+            safetyScore: Number(item.safety_score) || 100,
+            cleanTrips: Number(item.clean_trips) || 0,
+            totalTrips: Number(item.total_trips) || 0,
+            totalDistanceMiles: Number(item.total_distance_miles) || 0,
+            points: Number(item.points) || 0,
+            level: Number(item.level) || 1,
+            currentXp: Number(item.current_xp) || 0,
+            nextLevelXp: Number(item.next_level_xp) || 1000,
+            badgesUnlocked: item.badges_unlocked || ['BRONZE_GUARDIAN'],
+            tripHistory: item.trip_history || []
+          };
+          return maskPiiAccount(raw);
         });
 
         return res.status(200).json({ status: 'success', accounts, source: 'supabase' });
@@ -215,8 +224,8 @@ export default async function handler(req: any, res: any) {
   }
 
   if (req.method === 'POST') {
-    const account = req.body || {};
-    if (!account.username) {
+    const rawAccount = req.body || {};
+    if (!rawAccount.username) {
       return res.status(400).json({ status: 'error', message: 'Username is required' });
     }
 
@@ -228,80 +237,108 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const cleanKey = String(account.username).trim().toLowerCase();
+    const cleanUsername = sanitizeString(rawAccount.username, 30).toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const cleanFullName = sanitizeString(rawAccount.fullName || rawAccount.username, 80);
+    const cleanPhone = sanitizeString(rawAccount.phone || '', 25);
+    const cleanEmail = sanitizeString(rawAccount.email || '', 100);
+    const cleanParentName = sanitizeString(rawAccount.parentName || '', 80);
+    const cleanParentPhone = sanitizeString(rawAccount.parentPhone || '', 25);
+    const cleanParentEmail = sanitizeString(rawAccount.parentEmail || '', 100);
 
     try {
       const payload = {
-        username: cleanKey,
-        full_name: account.fullName || account.username,
-        phone: account.phone || '',
-        email: account.email || '',
-        parent_name: account.parentName || '',
-        parent_phone: account.parentPhone || '',
-        parent_email: account.parentEmail || '',
-        safety_score: Number(account.safetyScore) || 100,
-        clean_trips: Number(account.cleanTrips) || 0,
-        total_trips: Number(account.totalTrips) || 0,
-        total_distance_miles: Number(account.totalDistanceMiles) || 0,
-        points: Number(account.points) || 0,
-        level: Number(account.level) || 1,
-        current_xp: Number(account.currentXp) || 0,
-        next_level_xp: Number(account.nextLevelXp) || 1000,
-        badges_unlocked: Array.isArray(account.badgesUnlocked) ? account.badgesUnlocked : ['BRONZE_GUARDIAN'],
-        trip_history: Array.isArray(account.tripHistory) ? account.tripHistory : [],
-        account_data: account,
+        username: cleanUsername,
+        full_name: cleanFullName,
+        phone: cleanPhone,
+        email: cleanEmail,
+        parent_name: cleanParentName,
+        parent_phone: cleanParentPhone,
+        parent_email: cleanParentEmail,
+        safety_score: Math.min(100, Math.max(0, Number(rawAccount.safetyScore) || 100)),
+        clean_trips: Math.max(0, Number(rawAccount.cleanTrips) || 0),
+        total_trips: Math.max(0, Number(rawAccount.totalTrips) || 0),
+        total_distance_miles: Math.max(0, Number(rawAccount.totalDistanceMiles) || 0),
+        points: Math.max(0, Number(rawAccount.points) || 0),
+        level: Math.max(1, Number(rawAccount.level) || 1),
+        current_xp: Math.max(0, Number(rawAccount.currentXp) || 0),
+        next_level_xp: Math.max(100, Number(rawAccount.nextLevelXp) || 1000),
+        badges_unlocked: Array.isArray(rawAccount.badgesUnlocked) ? rawAccount.badgesUnlocked.slice(0, 30) : ['BRONZE_GUARDIAN'],
+        trip_history: Array.isArray(rawAccount.tripHistory) ? rawAccount.tripHistory.slice(0, 50) : [],
+        account_data: {
+          username: cleanUsername,
+          fullName: cleanFullName,
+          phone: cleanPhone,
+          email: cleanEmail,
+          parentName: cleanParentName,
+          parentPhone: cleanParentPhone,
+          parentEmail: cleanParentEmail,
+          safetyScore: Math.min(100, Math.max(0, Number(rawAccount.safetyScore) || 100)),
+          cleanTrips: Math.max(0, Number(rawAccount.cleanTrips) || 0),
+          totalTrips: Math.max(0, Number(rawAccount.totalTrips) || 0),
+          totalDistanceMiles: Math.max(0, Number(rawAccount.totalDistanceMiles) || 0),
+          points: Math.max(0, Number(rawAccount.points) || 0),
+          level: Math.max(1, Number(rawAccount.level) || 1),
+          currentXp: Math.max(0, Number(rawAccount.currentXp) || 0),
+          nextLevelXp: Math.max(100, Number(rawAccount.nextLevelXp) || 1000),
+          badgesUnlocked: Array.isArray(rawAccount.badgesUnlocked) ? rawAccount.badgesUnlocked.slice(0, 30) : ['BRONZE_GUARDIAN'],
+          tripHistory: Array.isArray(rawAccount.tripHistory) ? rawAccount.tripHistory.slice(0, 50) : []
+        },
         updated_at: new Date().toISOString()
       };
 
-      // 1. Try Upsert
-      const { data, error: upsertErr } = await supabase.from('driver_accounts').upsert(payload, { onConflict: 'username' }).select();
+      const { data, error: upsertErr } = await supabase
+        .from('driver_accounts')
+        .upsert(payload, { onConflict: 'username' })
+        .select();
 
       if (!upsertErr) {
         return res.status(200).json({
           status: 'success',
-          account,
+          account: payload.account_data,
           supabaseSaved: true,
           data
         });
       }
 
-      console.warn('Supabase driver_accounts upsert notice:', upsertErr.message);
+      // Fallback update/insert
+      const { error: updateErr } = await supabase
+        .from('driver_accounts')
+        .update(payload)
+        .eq('username', cleanUsername);
 
-      // 2. Fallback: Update existing row
-      const { error: updateErr } = await supabase.from('driver_accounts').update(payload).eq('username', cleanKey);
       if (!updateErr) {
         return res.status(200).json({
           status: 'success',
-          account,
+          account: payload.account_data,
           supabaseSaved: true,
           method: 'update'
         });
       }
 
-      // 3. Fallback: Insert new row
-      const { error: insertErr } = await supabase.from('driver_accounts').insert(payload);
+      const { error: insertErr } = await supabase
+        .from('driver_accounts')
+        .insert(payload);
+
       if (!insertErr) {
         return res.status(200).json({
           status: 'success',
-          account,
+          account: payload.account_data,
           supabaseSaved: true,
           method: 'insert'
         });
       }
 
-      const finalErrMsg = upsertErr.message || updateErr.message || insertErr.message;
       return res.status(500).json({
         status: 'error',
         supabaseSaved: false,
-        supabaseError: finalErrMsg,
-        details: 'Check Supabase table structure or RLS policies for driver_accounts.'
+        message: upsertErr.message || updateErr.message || insertErr.message
       });
     } catch (err: any) {
-      console.error('Server Supabase save account exception:', err);
+      console.error('Supabase write error:', err);
       return res.status(500).json({
         status: 'error',
         supabaseSaved: false,
-        supabaseError: err.message || 'Supabase exception during save'
+        message: err.message || 'Supabase write failure'
       });
     }
   }

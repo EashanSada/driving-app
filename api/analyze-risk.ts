@@ -1,10 +1,19 @@
+import { applySecurityHeaders, enforceRateLimit, sanitizeString } from './_security';
+
 export default async function handler(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  applySecurityHeaders(res);
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  // Rate limiting (60 analyses per minute per IP)
+  const rateLimitCheck = enforceRateLimit(req, 'analyze-risk', 60, 60 * 1000);
+  if (!rateLimitCheck.allowed) {
+    return res.status(rateLimitCheck.statusCode || 429).json({
+      status: 'error',
+      message: rateLimitCheck.message
+    });
   }
 
   if (req.method === 'GET') {
@@ -15,19 +24,22 @@ export default async function handler(req: any, res: any) {
     try {
       const payload = req.body || {};
       const telemetry = payload.telemetry || [];
-      const driverId = payload.driver_id || 'anonymous_youth';
+      const driverId = sanitizeString(payload.driver_id || 'anonymous_youth', 50);
 
       if (!Array.isArray(telemetry) || telemetry.length === 0) {
         return res.status(400).json({ status: 'error', message: 'Telemetry array required' });
       }
 
-      const velocities = telemetry.map((t: any) => Number(t.velocity || 0));
-      const gx = telemetry.map((t: any) => Number(t.g_force_x || 0));
-      const gy = telemetry.map((t: any) => Number(t.g_force_y || 0));
-      const gz = telemetry.map((t: any) => Number(t.g_force_z || 1.0));
-      const jerks = telemetry.map((t: any) => Number(t.braking_jerk || 0));
+      // Limit max telemetry points to prevent Denial-of-Service memory exhaustion
+      const safeTelemetry = telemetry.slice(0, 1000);
 
-      const n = telemetry.length;
+      const velocities = safeTelemetry.map((t: any) => Number(t.velocity || 0));
+      const gx = safeTelemetry.map((t: any) => Number(t.g_force_x || 0));
+      const gy = safeTelemetry.map((t: any) => Number(t.g_force_y || 0));
+      const gz = safeTelemetry.map((t: any) => Number(t.g_force_z || 1.0));
+      const jerks = safeTelemetry.map((t: any) => Number(t.braking_jerk || 0));
+
+      const n = safeTelemetry.length;
       const avgVelocity = velocities.reduce((a: number, b: number) => a + b, 0) / n;
       const maxVelocity = Math.max(...velocities);
 

@@ -216,5 +216,30 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             BatteryManager bm = (BatteryManager) context.getSystemService(BATTERY_SERVICE);
             return bm != null ? bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) : 100;
         }
+
+        @JavascriptInterface
+        public String encryptHardwareData(String plaintext) {
+            return NativeSecurityVault.getInstance().encryptPayload(plaintext);
+        }
+
+        @JavascriptInterface
+        public String decryptHardwareData(String ciphertext) {
+            return NativeSecurityVault.getInstance().decryptPayload(ciphertext);
+        }
+
+        @JavascriptInterface
+        public String signTelemetryPayload(String telemetryJson, String secretKey) {
+            return NativeSecurityVault.getInstance().generateTelemetrySignature(telemetryJson, secretKey);
+        }
+
+        @JavascriptInterface
+        public String generateSecureRandomToken() {
+            return NativeSecurityVault.getInstance().generateEntropySessionToken();
+        }
+
+        @JavascriptInterface
+        public boolean checkDeviceSecurityIntegrity() {
+            return NativeSecurityVault.getInstance().verifyDeviceIntegrity();
+        }
     }
 }
