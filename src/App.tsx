@@ -31,6 +31,19 @@ export default function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isDbModalOpen, setIsDbModalOpen] = useState(false);
 
+  const applyAccountPreferences = (acc: UserAccount | null) => {
+    if (!acc) return;
+    if (acc.unitSystem) {
+      setUnitSystem(acc.unitSystem);
+    }
+    if (acc.preferredLanguage) {
+      setCurrentLanguage(acc.preferredLanguage);
+      if ((window as any).DriveSafeApp) {
+        (window as any).DriveSafeApp.setLanguage(acc.preferredLanguage);
+      }
+    }
+  };
+
   useEffect(() => {
     // Check if Native Android Bridge is present
     if (typeof (window as any).AndroidBridge !== 'undefined') {
@@ -44,11 +57,13 @@ export default function App() {
       if (localAcc) {
         setActiveUsernameState(savedUser);
         setActiveAccount(localAcc);
+        applyAccountPreferences(localAcc);
       } else {
         fetchAccountFromSupabase(savedUser).then((cloudAcc) => {
           if (cloudAcc) {
             setActiveUsernameState(savedUser);
             setActiveAccount(cloudAcc);
+            applyAccountPreferences(cloudAcc);
           } else {
             setIsLoginModalOpen(true);
           }
@@ -65,10 +80,13 @@ export default function App() {
     }
   }, []);
 
-  const handleLoginSuccess = (username: string) => {
+  const handleLoginSuccess = (username: string, accountObj?: UserAccount) => {
     setActiveUsernameState(username);
-    const acc = getAccount(username);
-    setActiveAccount(acc);
+    const acc = accountObj || getAccount(username);
+    setActiveAccount(acc || null);
+    if (acc) {
+      applyAccountPreferences(acc);
+    }
     setIsLoginModalOpen(false);
   };
 
@@ -88,7 +106,9 @@ export default function App() {
   const handleTripCompleted = (summary: any) => {
     setLastTripSummary(summary);
     if (activeUsername) {
-      setActiveAccount(getAccount(activeUsername));
+      const refreshed = getAccount(activeUsername);
+      setActiveAccount(refreshed);
+      applyAccountPreferences(refreshed);
     }
     setActiveTab('analysis');
   };
@@ -144,73 +164,87 @@ export default function App() {
         }}
       />
 
-      {/* Main Content Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-4 pb-24 lg:pb-8">
+      {/* Main Responsive Body Area */}
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 mb-16 lg:mb-6">
         {activeTab === 'hud' && (
           <TelematicsHudView
-            currentLanguage={currentLanguage}
             unitSystem={unitSystem}
+            currentLanguage={currentLanguage}
             onTripCompleted={handleTripCompleted}
-            hasNativeBridge={hasNativeBridge}
+            activeAccount={activeAccount}
+            onRequireAccount={() => setIsLoginModalOpen(true)}
           />
         )}
 
         {activeTab === 'analysis' && (
           <RiskAnalysisView
-            lastTripSummary={lastTripSummary}
-            currentLanguage={currentLanguage}
             unitSystem={unitSystem}
+            currentLanguage={currentLanguage}
+            lastTripSummary={lastTripSummary}
+            activeAccount={activeAccount}
+            onNavigateToCockpit={() => setActiveTab('hud')}
           />
         )}
 
         {activeTab === 'trips' && (
           <TripHistoryReplayModal
-            isOpen={true}
-            onClose={() => setActiveTab('hud')}
             unitSystem={unitSystem}
+            currentLanguage={currentLanguage}
+            activeUsername={activeUsername}
           />
         )}
 
-        {activeTab === 'gdl' && <GdlTrackerView />}
+        {activeTab === 'gdl' && (
+          <GdlTrackerView
+            unitSystem={unitSystem}
+            currentLanguage={currentLanguage}
+            activeUsername={activeUsername}
+            activeAccount={activeAccount}
+          />
+        )}
 
-        {activeTab === 'supervisor' && <SupervisorCircleView unitSystem={unitSystem} />}
+        {activeTab === 'supervisor' && (
+          <SupervisorCircleView
+            unitSystem={unitSystem}
+            currentLanguage={currentLanguage}
+            activeUsername={activeUsername}
+            activeAccount={activeAccount}
+          />
+        )}
+
+        {activeTab === 'hazards' && (
+          <HazardMapView
+            unitSystem={unitSystem}
+            currentLanguage={currentLanguage}
+            activeUsername={activeUsername}
+          />
+        )}
+
+        {activeTab === 'community' && (
+          <CommunityGroupsView
+            unitSystem={unitSystem}
+            currentLanguage={currentLanguage}
+            activeUsername={activeUsername}
+            activeAccount={activeAccount}
+          />
+        )}
 
         {activeTab === 'leaderboard' && (
-          <LeaderboardView onOpenLoginModal={() => setIsLoginModalOpen(true)} />
+          <LeaderboardView
+            unitSystem={unitSystem}
+            currentLanguage={currentLanguage}
+            activeAccount={activeAccount}
+          />
         )}
 
         {activeTab === 'gamification' && (
-          <GamificationView onOpenLoginModal={() => setIsLoginModalOpen(true)} />
+          <GamificationView
+            unitSystem={unitSystem}
+            currentLanguage={currentLanguage}
+            activeAccount={activeAccount}
+          />
         )}
-
-        {activeTab === 'hazards' && <HazardMapView unitSystem={unitSystem} />}
-
-        {activeTab === 'community' && <CommunityGroupsView onOpenLoginModal={() => setIsLoginModalOpen(true)} />}
       </main>
-
-      {/* Luxury Minimalist App Footer */}
-      <footer className="bg-white/80 backdrop-blur-md border-t border-stone-200/60 my-2 mx-4 lg:mx-8 py-3.5 px-6 rounded-2xl text-xs text-stone-500 shadow-xs">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-stone-700 text-[11px]">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>
-              RadianDrive Telematics • Active Driver:{' '}
-              <strong className="text-stone-900 font-bold">{activeUsername || 'Guest'}</strong> (
-              {activeAccount?.role === 'gdl_student'
-                ? "Permit Student"
-                : activeAccount?.role === 'parent_mentor'
-                ? "Parent / Mentor"
-                : activeAccount?.role === 'driving_instructor'
-                ? "Driving Instructor"
-                : "Young Driver"}
-              )
-            </span>
-          </div>
-          <p className="font-medium text-[11px] text-stone-400">
-            © {new Date().getFullYear()} RadianDrive • Precision Telematics & Youth Mentorship
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }

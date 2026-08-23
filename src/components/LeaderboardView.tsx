@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Trophy, Medal, Award, Star, UserCheck, Plus, User } from 'lucide-react';
+import { Trophy, Medal, Award, Star, UserCheck, Plus, User, MapPin } from 'lucide-react';
 import { fetchAllAccountsFromSupabase, getActiveUsername, UserAccount } from '../lib/accountManager';
-import { RadianSymbol } from './RadianSymbol';
+import { LanguageCode, UnitSystem } from '../types';
 
 interface LeaderboardViewProps {
   onOpenLoginModal?: () => void;
+  activeAccount?: UserAccount | null;
+  unitSystem?: UnitSystem;
+  currentLanguage?: LanguageCode;
 }
 
 export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onOpenLoginModal }) => {
@@ -51,14 +54,14 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onOpenLoginMod
                 Safety Standings & Leaderboard
               </h2>
               <p className="text-xs text-stone-500 mt-0.5">
-                Ranks drivers by verified telematics safety scores and defensive driving consistency.
+                Ranks drivers by verified telematics safety scores, location, and defensive driving consistency.
               </p>
             </div>
           </div>
 
           <button
             onClick={onOpenLoginModal}
-            className="btn-gold px-4 py-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer shrink-0"
+            className="btn-gold px-4 py-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer shrink-0 font-bold"
           >
             <Plus className="w-4 h-4" />
             <span>Driver Account</span>
@@ -81,12 +84,12 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onOpenLoginMod
             <div className="space-y-1">
               <h3 className="text-base font-bold text-stone-900 font-display">No Driver Accounts Found</h3>
               <p className="text-xs text-stone-500 max-w-md mx-auto">
-                Sign in with a username to log your real driving sessions and establish your safety rating.
+                Sign in or register a new account to establish your driver rating and join the leaderboard.
               </p>
             </div>
             <button
               onClick={onOpenLoginModal}
-              className="btn-gold px-5 py-2.5 rounded-xl text-xs cursor-pointer inline-flex items-center gap-2"
+              className="btn-gold px-5 py-2.5 rounded-xl text-xs cursor-pointer inline-flex items-center gap-2 font-bold"
             >
               <Plus className="w-4 h-4" />
               <span>Create Account</span>
@@ -99,6 +102,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onOpenLoginMod
                 <tr>
                   <th className="py-3 px-6">Rank</th>
                   <th className="py-3 px-6">Driver</th>
+                  <th className="py-3 px-6">Location</th>
                   <th className="py-3 px-6">Safety Score</th>
                   <th className="py-3 px-6">Total Sessions</th>
                   <th className="py-3 px-6">Clean Drives</th>
@@ -145,6 +149,15 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onOpenLoginMod
                             <span className="text-[10px] text-stone-400 uppercase font-mono">@{acc.username}</span>
                           </div>
                         </div>
+                      </td>
+
+                      <td className="py-3.5 px-6 text-stone-600">
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-[#A38258]" />
+                          <span>
+                            {acc.city ? `${acc.city}, ` : ''}{acc.country || 'Global'}
+                          </span>
+                        </span>
                       </td>
 
                       <td className="py-3.5 px-6 font-mono font-bold text-emerald-800 text-sm">

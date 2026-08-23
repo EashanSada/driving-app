@@ -5,22 +5,16 @@ import {
   Trophy,
   Award,
   AlertTriangle,
-  ShieldCheck,
   User,
   History,
   GraduationCap,
   Users,
-  Wifi,
-  WifiOff,
   Menu,
   X,
   ChevronDown,
-  Globe,
-  Sliders,
-  Radio
+  MapPin
 } from 'lucide-react';
 import { LanguageCode, NavTab, UnitSystem, UserRole } from '../types';
-import { t } from '../translations';
 import { UserAccount } from '../lib/accountManager';
 import { RadianSymbol } from './RadianSymbol';
 
@@ -28,22 +22,19 @@ interface NavigationHeaderProps {
   activeTab: NavTab;
   setActiveTab: (tab: NavTab) => void;
   currentLanguage: LanguageCode;
-  setLanguage: (lang: LanguageCode) => void;
+  setLanguage?: (lang: LanguageCode) => void;
   unitSystem: UnitSystem;
-  setUnitSystem: (system: UnitSystem) => void;
+  setUnitSystem?: (system: UnitSystem) => void;
   activeUsername: string | null;
   activeAccount: UserAccount | null;
   onOpenLoginModal: () => void;
-  onOpenDbModal: () => void;
+  onOpenDbModal?: () => void;
 }
 
 export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
   activeTab,
   setActiveTab,
-  currentLanguage,
-  setLanguage,
   unitSystem,
-  setUnitSystem,
   activeUsername,
   activeAccount,
   onOpenLoginModal,
@@ -73,13 +64,6 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
-
-  const languageNames: Record<LanguageCode, { label: string; code: string }> = {
-    en: { label: 'English', code: 'EN' },
-    es: { label: 'Español', code: 'ES' },
-    fr: { label: 'Français', code: 'FR' },
-    zh: { label: 'Mandarin', code: 'ZH' }
-  };
 
   const userRole: UserRole = activeAccount?.role || 'young_driver';
 
@@ -204,7 +188,17 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
           </nav>
 
           {/* Quick Actions & Profile Zone */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
+            {/* Location & Speed Unit Badge derived from Questionnaire */}
+            {activeAccount && (
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-stone-100 border border-stone-200 text-stone-700">
+                <MapPin className="w-3 h-3 text-[#A38258]" />
+                <span>
+                  {activeAccount.city || activeAccount.country || 'Global'} • {unitSystem === 'metric' ? 'KM/H' : 'MPH'}
+                </span>
+              </div>
+            )}
+
             {/* Minimalist Sync Indicator */}
             <div
               className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono border ${
@@ -218,42 +212,6 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
               <span>{isOnline ? 'Synced' : 'Offline'}</span>
             </div>
 
-            {/* Units Toggle (MPH / KM/H) */}
-            <div className="hidden sm:flex items-center bg-stone-100 p-0.5 rounded-lg border border-stone-200">
-              <button
-                onClick={() => setUnitSystem('imperial')}
-                className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                  unitSystem === 'imperial' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-800'
-                }`}
-              >
-                MPH
-              </button>
-              <button
-                onClick={() => setUnitSystem('metric')}
-                className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                  unitSystem === 'metric' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-800'
-                }`}
-              >
-                KM/H
-              </button>
-            </div>
-
-            {/* Language Selector */}
-            <div className="hidden sm:flex items-center bg-stone-100 p-0.5 rounded-lg border border-stone-200">
-              {(Object.keys(languageNames) as LanguageCode[]).map((lang) => (
-                <button
-                  key={lang}
-                  onClick={() => setLanguage(lang)}
-                  className={`px-1.5 py-0.5 text-[10px] font-bold rounded cursor-pointer transition-all ${
-                    currentLanguage === lang ? 'bg-stone-900 text-white' : 'text-stone-500 hover:text-stone-800'
-                  }`}
-                  title={languageNames[lang].label}
-                >
-                  {languageNames[lang].code}
-                </button>
-              ))}
-            </div>
-
             {/* Driver Profile Trigger */}
             {activeUsername && activeAccount ? (
               <button
@@ -262,7 +220,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
                 title="View Driver Account Profile"
               >
                 <div className="text-right hidden md:block leading-tight">
-                  <div className="text-xs font-bold text-stone-900 truncate max-w-[100px]">
+                  <div className="text-xs font-bold text-stone-900 truncate max-w-[110px]">
                     {activeAccount.fullName || activeAccount.username}
                   </div>
                   <div className="text-[9px] font-mono font-bold text-[#A38258]">
@@ -276,7 +234,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
             ) : (
               <button
                 onClick={onOpenLoginModal}
-                className="btn-gold px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer"
+                className="btn-gold px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer font-bold"
               >
                 <User className="w-3.5 h-3.5" />
                 <span>Sign In</span>
@@ -317,41 +275,17 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
               })}
             </div>
 
-            {/* Mobile Units & Language Bar */}
-            <div className="flex items-center justify-between pt-2 border-t border-stone-200 text-xs">
-              <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-lg border border-stone-200">
-                <button
-                  onClick={() => setUnitSystem('imperial')}
-                  className={`px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
-                    unitSystem === 'imperial' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500'
-                  }`}
-                >
-                  MPH
-                </button>
-                <button
-                  onClick={() => setUnitSystem('metric')}
-                  className={`px-2.5 py-1 rounded text-xs font-bold transition-all cursor-pointer ${
-                    unitSystem === 'metric' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500'
-                  }`}
-                >
-                  KM/H
-                </button>
+            {activeAccount && (
+              <div className="pt-2 border-t border-stone-200 flex items-center justify-between text-xs text-stone-600 px-1">
+                <span className="flex items-center gap-1 font-semibold">
+                  <MapPin className="w-3.5 h-3.5 text-[#A38258]" />
+                  {activeAccount.city || activeAccount.country || 'Global'}
+                </span>
+                <span className="font-mono font-bold text-stone-900">
+                  {unitSystem === 'metric' ? 'KM/H' : 'MPH'}
+                </span>
               </div>
-
-              <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-lg border border-stone-200">
-                {(Object.keys(languageNames) as LanguageCode[]).map((lang) => (
-                  <button
-                    key={lang}
-                    onClick={() => setLanguage(lang)}
-                    className={`px-2 py-1 text-xs font-bold rounded cursor-pointer transition-all ${
-                      currentLanguage === lang ? 'bg-stone-900 text-white' : 'text-stone-500'
-                    }`}
-                  >
-                    {languageNames[lang].code}
-                  </button>
-                ))}
-              </div>
-            </div>
+            )}
           </div>
         )}
       </header>

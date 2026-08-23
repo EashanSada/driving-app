@@ -1,4 +1,4 @@
-import { UnitSystem, UserRole, UserPreferences, StoredTrip, TripBreadcrumb } from '../types';
+import { UnitSystem, UserRole, UserPreferences, StoredTrip, TripBreadcrumb, LanguageCode } from '../types';
 import { getSupabaseClient, getSupabaseUrl, getSupabaseAnonKey, isSupabaseConfigured } from './supabaseClient';
 import { saveTrip } from './offlineTripStore';
 
@@ -17,6 +17,11 @@ export interface UserAccount {
   fullName: string;
   phone?: string;
   email?: string;
+  city?: string;
+  stateProvince?: string;
+  country?: string;
+  preferredLanguage?: LanguageCode;
+  unitSystem?: UnitSystem;
   role?: UserRole;
   licenseStage?: 'permit' | 'provisional' | 'full';
   parentName?: string;
@@ -37,8 +42,68 @@ export interface UserAccount {
   supervisorCode?: string;
 }
 
-const ACTIVE_USER_KEY = 'drivesafe_active_username_v2';
-const ACCOUNTS_MAP_KEY = 'drivesafe_accounts_map_v2';
+const ACTIVE_USER_KEY = 'drivesafe_active_username_v4';
+const ACCOUNTS_MAP_KEY = 'drivesafe_accounts_map_v4';
+const SYSTEM_PURGE_KEY = 'drivesafe_system_purged_v5';
+
+// Helper to determine speed unit from country
+export function getUnitSystemForCountry(countryName: string): UnitSystem {
+  const c = (countryName || '').trim().toLowerCase();
+  if (
+    c.includes('united states') ||
+    c.includes('usa') ||
+    c === 'us' ||
+    c.includes('united kingdom') ||
+    c.includes('uk') ||
+    c.includes('great britain') ||
+    c.includes('liberia') ||
+    c.includes('myanmar') ||
+    c.includes('burma') ||
+    c.includes('bahamas')
+  ) {
+    return 'imperial';
+  }
+  return 'metric';
+}
+
+// Purge all legacy user and trip data so users start completely fresh
+export function purgeAllSystemUserData(): void {
+  try {
+    // Clear all localStorage keys
+    const keepKeys = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'];
+    const preserved: Record<string, string> = {};
+    keepKeys.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v) preserved[k] = v;
+    });
+
+    localStorage.clear();
+
+    // Restore preserved config
+    Object.keys(preserved).forEach(k => {
+      localStorage.setItem(k, preserved[k]);
+    });
+
+    // Mark system as purged
+    localStorage.setItem(SYSTEM_PURGE_KEY, 'true');
+
+    // Notify backend server to wipe stale cloud accounts if configured
+    fetch('/api/accounts', { method: 'DELETE' }).catch(() => {});
+  } catch (err) {
+    console.error('Purge user data error:', err);
+  }
+}
+
+// Initialize system purge once on startup
+if (typeof window !== 'undefined') {
+  try {
+    if (localStorage.getItem(SYSTEM_PURGE_KEY) !== 'true') {
+      purgeAllSystemUserData();
+    }
+  } catch (err) {
+    console.warn('Initial purge check notice:', err);
+  }
+}
 
 export function getActiveUsername(): string | null {
   try {
@@ -99,21 +164,37 @@ export function getAccount(username: string): UserAccount | null {
 export function createAccount(data: {
   username: string;
   fullName: string;
-  phone: string;
-  email: string;
-  parentName: string;
-  parentPhone: string;
-  parentEmail: string;
+  phone?: string;
+  email?: string;
+  city?: string;
+  stateProvince?: string;
+  country?: string;
+  preferredLanguage?: LanguageCode;
+  unitSystem?: UnitSystem;
+  role?: UserRole;
+  parentName?: string;
+  parentPhone?: string;
+  parentEmail?: string;
 }): UserAccount {
   const cleanName = data.username.trim();
+  const country = data.country?.trim() || 'United States';
+  const unitSys = data.unitSystem || getUnitSystemForCountry(country);
+  const lang = data.preferredLanguage || 'en';
+
   const newAccount: UserAccount = {
     username: cleanName,
     fullName: data.fullName.trim() || cleanName,
-    phone: data.phone.trim(),
-    email: data.email.trim(),
-    parentName: data.parentName.trim(),
-    parentPhone: data.parentPhone.trim(),
-    parentEmail: data.parentEmail.trim(),
+    phone: data.phone?.trim() || '',
+    email: data.email?.trim() || '',
+    city: data.city?.trim() || '',
+    stateProvince: data.stateProvince?.trim() || '',
+    country: country,
+    preferredLanguage: lang,
+    unitSystem: unitSys,
+    role: data.role || 'young_driver',
+    parentName: data.parentName?.trim() || '',
+    parentPhone: data.parentPhone?.trim() || '',
+    parentEmail: data.parentEmail?.trim() || '',
     createdTime: Date.now(),
     safetyScore: 100,
     cleanTrips: 0,
@@ -123,8 +204,18 @@ export function createAccount(data: {
     level: 1,
     currentXp: 0,
     nextLevelXp: 1000,
-    badgesUnlocked: [],
-    tripHistory: []
+    badgesUnlocked: ['BRONZE_GUARDIAN'],
+    tripHistory: [],
+    supervisorCode: 'RAD-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
+    preferences: {
+      audioVoiceAlerts: true,
+      audioChimes: true,
+      autoTripDetection: true,
+      speedLimitWarnings: true,
+      offlineSyncEnabled: true,
+      role: data.role || 'young_driver',
+      gdlEnabled: true
+    }
   };
 
   saveAccount(newAccount);
@@ -187,6 +278,12 @@ export async function fetchAccountFromSupabase(username: string): Promise<UserAc
           fullName: data.full_name || cleanName,
           phone: data.phone || '',
           email: data.email || '',
+          city: data.city || '',
+          stateProvince: data.state_province || '',
+          country: data.country || '',
+          preferredLanguage: data.preferred_language || 'en',
+          unitSystem: data.unit_system || 'imperial',
+          role: 'young_driver',
           parentName: data.parent_name || '',
           parentPhone: data.parent_phone || '',
           parentEmail: data.parent_email || '',
@@ -263,6 +360,12 @@ export async function fetchAllAccountsFromSupabase(): Promise<UserAccount[]> {
             fullName: item.full_name || item.username,
             phone: item.phone || '',
             email: item.email || '',
+            city: item.city || '',
+            stateProvince: item.state_province || '',
+            country: item.country || '',
+            preferredLanguage: item.preferred_language || 'en',
+            unitSystem: item.unit_system || 'imperial',
+            role: 'young_driver',
             parentName: item.parent_name || '',
             parentPhone: item.parent_phone || '',
             parentEmail: item.parent_email || '',
@@ -396,28 +499,44 @@ export async function saveAccountAsync(account: UserAccount): Promise<{ success:
 
   return {
     success: false,
-    message: serverError || 'Supabase credentials missing on server & client.'
+    message: serverError || 'Account saved locally.'
   };
 }
 
 export async function createAccountAsync(data: {
   username: string;
   fullName: string;
-  phone: string;
-  email: string;
-  parentName: string;
-  parentPhone: string;
-  parentEmail: string;
+  phone?: string;
+  email?: string;
+  city?: string;
+  stateProvince?: string;
+  country?: string;
+  preferredLanguage?: LanguageCode;
+  unitSystem?: UnitSystem;
+  role?: UserRole;
+  parentName?: string;
+  parentPhone?: string;
+  parentEmail?: string;
 }): Promise<{ account: UserAccount; syncResult: { success: boolean; message?: string } }> {
   const cleanName = data.username.trim();
+  const country = data.country?.trim() || 'United States';
+  const unitSys = data.unitSystem || getUnitSystemForCountry(country);
+  const lang = data.preferredLanguage || 'en';
+
   const newAccount: UserAccount = {
     username: cleanName,
     fullName: data.fullName.trim() || cleanName,
-    phone: data.phone.trim(),
-    email: data.email.trim(),
-    parentName: data.parentName.trim(),
-    parentPhone: data.parentPhone.trim(),
-    parentEmail: data.parentEmail.trim(),
+    phone: data.phone?.trim() || '',
+    email: data.email?.trim() || '',
+    city: data.city?.trim() || '',
+    stateProvince: data.stateProvince?.trim() || '',
+    country: country,
+    preferredLanguage: lang,
+    unitSystem: unitSys,
+    role: data.role || 'young_driver',
+    parentName: data.parentName?.trim() || '',
+    parentPhone: data.parentPhone?.trim() || '',
+    parentEmail: data.parentEmail?.trim() || '',
     createdTime: Date.now(),
     safetyScore: 100,
     cleanTrips: 0,
@@ -428,7 +547,17 @@ export async function createAccountAsync(data: {
     currentXp: 0,
     nextLevelXp: 1000,
     badgesUnlocked: ['BRONZE_GUARDIAN'],
-    tripHistory: []
+    tripHistory: [],
+    supervisorCode: 'RAD-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
+    preferences: {
+      audioVoiceAlerts: true,
+      audioChimes: true,
+      autoTripDetection: true,
+      speedLimitWarnings: true,
+      offlineSyncEnabled: true,
+      role: data.role || 'young_driver',
+      gdlEnabled: true
+    }
   };
 
   saveAccount(newAccount);
@@ -436,7 +565,6 @@ export async function createAccountAsync(data: {
   setActiveUsername(cleanName);
   return { account: newAccount, syncResult };
 }
-
 
 export function logoutActiveUser(): void {
   try {

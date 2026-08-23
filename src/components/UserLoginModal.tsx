@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   User,
   ShieldCheck,
@@ -8,24 +8,54 @@ import {
   GraduationCap,
   Sparkles,
   Check,
-  X
+  X,
+  MapPin,
+  Globe,
+  Gauge,
+  Languages,
+  Phone,
+  Mail,
+  Building2,
+  Compass
 } from 'lucide-react';
 import {
   accountExists,
   createAccountAsync,
   fetchAccountFromSupabase,
   getAllAccounts,
-  setActiveUsername
+  getUnitSystemForCountry,
+  setActiveUsername,
+  UserAccount
 } from '../lib/accountManager';
-import { UserRole } from '../types';
+import { LanguageCode, UnitSystem, UserRole } from '../types';
 import { RadianSymbol } from './RadianSymbol';
 
 interface UserLoginModalProps {
   isOpen: boolean;
-  onLoginSuccess: (username: string) => void;
+  onLoginSuccess: (username: string, account?: UserAccount) => void;
   onClose?: () => void;
   allowCancel?: boolean;
 }
+
+const COUNTRIES_LIST = [
+  { name: 'United States', code: 'US', defaultUnit: 'imperial' as UnitSystem, defaultLang: 'en' as LanguageCode },
+  { name: 'United Kingdom', code: 'UK', defaultUnit: 'imperial' as UnitSystem, defaultLang: 'en' as LanguageCode },
+  { name: 'Canada', code: 'CA', defaultUnit: 'metric' as UnitSystem, defaultLang: 'en' as LanguageCode },
+  { name: 'Australia', code: 'AU', defaultUnit: 'metric' as UnitSystem, defaultLang: 'en' as LanguageCode },
+  { name: 'Mexico', code: 'MX', defaultUnit: 'metric' as UnitSystem, defaultLang: 'es' as LanguageCode },
+  { name: 'Spain', code: 'ES', defaultUnit: 'metric' as UnitSystem, defaultLang: 'es' as LanguageCode },
+  { name: 'France', code: 'FR', defaultUnit: 'metric' as UnitSystem, defaultLang: 'fr' as LanguageCode },
+  { name: 'Germany', code: 'DE', defaultUnit: 'metric' as UnitSystem, defaultLang: 'en' as LanguageCode },
+  { name: 'Italy', code: 'IT', defaultUnit: 'metric' as UnitSystem, defaultLang: 'en' as LanguageCode },
+  { name: 'Japan', code: 'JP', defaultUnit: 'metric' as UnitSystem, defaultLang: 'en' as LanguageCode },
+  { name: 'China', code: 'CN', defaultUnit: 'metric' as UnitSystem, defaultLang: 'zh' as LanguageCode },
+  { name: 'India', code: 'IN', defaultUnit: 'metric' as UnitSystem, defaultLang: 'en' as LanguageCode },
+  { name: 'Brazil', code: 'BR', defaultUnit: 'metric' as UnitSystem, defaultLang: 'en' as LanguageCode },
+  { name: 'Netherlands', code: 'NL', defaultUnit: 'metric' as UnitSystem, defaultLang: 'en' as LanguageCode },
+  { name: 'Sweden', code: 'SE', defaultUnit: 'metric' as UnitSystem, defaultLang: 'en' as LanguageCode },
+  { name: 'South Korea', code: 'KR', defaultUnit: 'metric' as UnitSystem, defaultLang: 'en' as LanguageCode },
+  { name: 'Other Country', code: 'OTHER', defaultUnit: 'metric' as UnitSystem, defaultLang: 'en' as LanguageCode },
+];
 
 export const UserLoginModal: React.FC<UserLoginModalProps> = ({
   isOpen,
@@ -33,14 +63,23 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
   onClose,
   allowCancel = false
 }) => {
-  const [step, setStep] = useState<'LOGIN' | 'ROLE' | 'DETAILS' | 'PREFERENCES'>('LOGIN');
+  const [step, setStep] = useState<'LOGIN' | 'LOCATION' | 'PROFILE' | 'PREFERENCES'>('LOGIN');
   const [usernameInput, setUsernameInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Registration Data
+  // Questionnaire Data
   const [selectedRole, setSelectedRole] = useState<UserRole>('young_driver');
   const [fullName, setFullName] = useState('');
+  
+  // Location & Localization
+  const [city, setCity] = useState('');
+  const [stateProvince, setStateProvince] = useState('');
+  const [country, setCountry] = useState('United States');
+  const [preferredLanguage, setPreferredLanguage] = useState<LanguageCode>('en');
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>('imperial');
+
+  // Contact Details
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [parentName, setParentName] = useState('');
@@ -50,15 +89,29 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
   const [voiceAlerts, setVoiceAlerts] = useState(true);
   const [autoTripDetect, setAutoTripDetect] = useState(true);
 
+  // Update unit system automatically when country changes
+  const handleCountryChange = (selectedCountry: string) => {
+    setCountry(selectedCountry);
+    const countryConfig = COUNTRIES_LIST.find(c => c.name === selectedCountry);
+    if (countryConfig) {
+      setUnitSystem(countryConfig.defaultUnit);
+      if (countryConfig.defaultLang && preferredLanguage === 'en') {
+        setPreferredLanguage(countryConfig.defaultLang);
+      }
+    } else {
+      setUnitSystem(getUnitSystemForCountry(selectedCountry));
+    }
+  };
+
   const existingAccounts = getAllAccounts();
 
   if (!isOpen) return null;
 
   const handleLoginCheck = async (e: React.FormEvent) => {
     e.preventDefault();
-    const clean = usernameInput.trim();
+    const clean = usernameInput.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
     if (!clean) {
-      setErrorMsg('Please enter a username.');
+      setErrorMsg('Please enter a username (letters, numbers, and underscores).');
       return;
     }
 
@@ -69,26 +122,29 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
       const cloudAccount = await fetchAccountFromSupabase(clean);
       if (cloudAccount) {
         setActiveUsername(clean);
-        onLoginSuccess(clean);
+        onLoginSuccess(clean, cloudAccount);
         resetState();
         return;
       }
 
       if (accountExists(clean)) {
+        const localAcc = getAllAccounts().find(a => a.username.toLowerCase() === clean);
         setActiveUsername(clean);
-        onLoginSuccess(clean);
+        onLoginSuccess(clean, localAcc);
         resetState();
         return;
       }
 
-      setStep('ROLE');
+      // If account does not exist, navigate to Questionnaire starting with Location & Language
+      setStep('LOCATION');
     } catch (err: any) {
       if (accountExists(clean)) {
+        const localAcc = getAllAccounts().find(a => a.username.toLowerCase() === clean);
         setActiveUsername(clean);
-        onLoginSuccess(clean);
+        onLoginSuccess(clean, localAcc);
         resetState();
       } else {
-        setStep('ROLE');
+        setStep('LOCATION');
       }
     } finally {
       setIsSubmitting(false);
@@ -96,22 +152,35 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
   };
 
   const handleCreateAccountFinal = async () => {
+    if (!city.trim()) {
+      setErrorMsg('Please enter your city.');
+      setStep('LOCATION');
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMsg('');
 
+    const cleanUser = usernameInput.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+
     try {
-      await createAccountAsync({
-        username: usernameInput.trim(),
-        fullName: fullName.trim() || usernameInput.trim(),
+      const { account } = await createAccountAsync({
+        username: cleanUser,
+        fullName: fullName.trim() || cleanUser,
+        city: city.trim(),
+        stateProvince: stateProvince.trim(),
+        country: country.trim(),
+        preferredLanguage,
+        unitSystem,
+        role: selectedRole,
         phone: phone.trim(),
         email: email.trim(),
         parentName: parentName.trim(),
-        parentPhone: parentPhone.trim(),
-        parentEmail: ''
+        parentPhone: parentPhone.trim()
       });
 
-      setActiveUsername(usernameInput.trim());
-      onLoginSuccess(usernameInput.trim());
+      setActiveUsername(cleanUser);
+      onLoginSuccess(cleanUser, account);
       resetState();
     } catch (err: any) {
       setErrorMsg('Failed to save account: ' + err.message);
@@ -129,7 +198,7 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="luxury-card max-w-lg w-full p-6 sm:p-8 border border-[#C5A880]/30 shadow-2xl relative text-left">
+      <div className="luxury-card max-w-lg w-full p-6 sm:p-8 border border-[#C5A880]/30 shadow-2xl relative text-left max-h-[92vh] overflow-y-auto">
         {allowCancel && onClose && (
           <button
             onClick={() => {
@@ -153,7 +222,7 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
                 RADIAN<span className="text-[#A38258]">DRIVE</span>
               </h2>
               <p className="text-xs text-stone-500 max-w-sm mx-auto">
-                Precision telematics, safety scores, and supervised licensing hours for teen drivers.
+                Precision telematics, safety scoring, and driver localization. Sign in or register below.
               </p>
             </div>
 
@@ -177,18 +246,21 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
                   placeholder="e.g. alex_driver, sarah_k"
                   className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm font-bold text-stone-900 focus:outline-none focus:border-[#C5A880]"
                 />
+                <p className="text-[10px] text-stone-400 mt-1">
+                  New users will automatically be directed to the account registration questionnaire.
+                </p>
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full btn-gold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                className="w-full btn-gold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 font-bold"
               >
                 {isSubmitting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <>
-                    <span>Continue to Drive</span>
+                    <span>Continue to Cockpit</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -199,7 +271,7 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
             {existingAccounts.length > 0 && (
               <div className="pt-4 border-t border-stone-100 space-y-2">
                 <span className="text-[10px] text-stone-400 uppercase font-bold tracking-wider block">
-                  Switch Account
+                  Registered Drivers On System
                 </span>
                 <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
                   {existingAccounts.map((acc) => (
@@ -207,14 +279,16 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
                       key={acc.username}
                       onClick={() => {
                         setActiveUsername(acc.username);
-                        onLoginSuccess(acc.username);
+                        onLoginSuccess(acc.username, acc);
                         resetState();
                       }}
                       className="px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200/80 border border-stone-200 text-xs font-bold text-stone-800 transition-all cursor-pointer flex items-center gap-1.5"
                     >
                       <span className="w-2 h-2 rounded-full bg-emerald-500" />
                       <span>{acc.fullName || acc.username}</span>
-                      <span className="text-[10px] text-[#A38258]">({acc.safetyScore} pts)</span>
+                      <span className="text-[10px] text-[#A38258]">
+                        ({acc.country || 'Global'} • {acc.unitSystem === 'metric' ? 'KM/H' : 'MPH'})
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -223,71 +297,149 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
           </div>
         )}
 
-        {/* STEP 2: Role Selection */}
-        {step === 'ROLE' && (
-          <div className="space-y-5">
+        {/* STEP 2: Location, Region & Preferred Language Questionnaire */}
+        {step === 'LOCATION' && (
+          <div className="space-y-4">
             <div>
               <span className="text-[10px] text-[#A38258] uppercase font-bold tracking-widest font-mono">
-                Step 1 of 3 • Account Setup
+                Step 1 of 3 • Location & Localization
               </span>
-              <h3 className="text-lg font-bold text-stone-900 font-display mt-0.5">Choose Driver Account Type</h3>
+              <h3 className="text-lg font-bold text-stone-900 font-display mt-0.5">
+                Where are you driving?
+              </h3>
+              <p className="text-xs text-stone-500">
+                Your location automatically configures your telematics speed units (MPH vs KM/H) and interface language.
+              </p>
             </div>
 
-            <div className="space-y-2.5">
-              {[
-                {
-                  id: 'young_driver' as UserRole,
-                  title: 'Young / Teen Driver',
-                  desc: 'Provisional or young licensed driver tracking defensive habits and rewards.',
-                  icon: <User className="w-4 h-4 text-[#A38258]" />
-                },
-                {
-                  id: 'gdl_student' as UserRole,
-                  title: "Learner's Permit Student",
-                  desc: '50-hour state GDL tracker with day/night logs and parent oversight.',
-                  icon: <GraduationCap className="w-4 h-4 text-stone-900" />
-                },
-                {
-                  id: 'parent_mentor' as UserRole,
-                  title: 'Parent / Family Mentor',
-                  desc: 'Review teen telemetry, supervise practice hours, and export DMV reports.',
-                  icon: <ShieldCheck className="w-4 h-4 text-emerald-700" />
-                },
-                {
-                  id: 'driving_instructor' as UserRole,
-                  title: 'Certified Driving Instructor',
-                  desc: 'Manage student rosters, certify driving competencies, and coach road safety.',
-                  icon: <Users className="w-4 h-4 text-indigo-700" />
-                }
-              ].map((r) => (
-                <div
-                  key={r.id}
-                  onClick={() => setSelectedRole(r.id)}
-                  className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-3 ${
-                    selectedRole === r.id
-                      ? 'bg-white border-[#C5A880] shadow-md'
-                      : 'bg-stone-50 border-stone-200 hover:bg-white'
-                  }`}
+            {errorMsg && (
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
+                {errorMsg}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {/* Country Selection */}
+              <div>
+                <label className="text-xs font-bold text-stone-700 flex items-center gap-1 mb-1">
+                  <Globe className="w-3.5 h-3.5 text-[#A38258]" />
+                  <span>Country</span>
+                </label>
+                <select
+                  value={country}
+                  onChange={(e) => handleCountryChange(e.target.value)}
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:border-[#C5A880] cursor-pointer"
                 >
-                  <div className="flex items-start gap-2.5">
-                    <div className="mt-0.5">{r.icon}</div>
-                    <div>
-                      <span className="text-xs font-bold text-stone-900 block">{r.title}</span>
-                      <p className="text-[11px] text-stone-500 mt-0.5">{r.desc}</p>
-                    </div>
+                  {COUNTRIES_LIST.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name} ({c.defaultUnit === 'imperial' ? 'MPH' : 'KM/H'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* City & State/Province Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-xs font-bold text-stone-700 flex items-center gap-1 mb-1">
+                    <Building2 className="w-3.5 h-3.5 text-[#A38258]" />
+                    <span>City *</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="e.g. San Francisco, Toronto, London"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-[#C5A880]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-700 flex items-center gap-1 mb-1">
+                    <MapPin className="w-3.5 h-3.5 text-[#A38258]" />
+                    <span>State / Province</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={stateProvince}
+                    onChange={(e) => setStateProvince(e.target.value)}
+                    placeholder="e.g. California, Ontario, NSW"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-[#C5A880]"
+                  />
+                </div>
+              </div>
+
+              {/* Preferred Language Selection */}
+              <div>
+                <label className="text-xs font-bold text-stone-700 flex items-center gap-1 mb-1">
+                  <Languages className="w-3.5 h-3.5 text-[#A38258]" />
+                  <span>Preferred Language</span>
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { code: 'en' as LanguageCode, label: 'English', native: 'English' },
+                    { code: 'es' as LanguageCode, label: 'Spanish', native: 'Español' },
+                    { code: 'fr' as LanguageCode, label: 'French', native: 'Français' },
+                    { code: 'zh' as LanguageCode, label: 'Chinese', native: '中文' }
+                  ].map((lang) => (
+                    <button
+                      key={lang.code}
+                      type="button"
+                      onClick={() => setPreferredLanguage(lang.code)}
+                      className={`p-2 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
+                        preferredLanguage === lang.code
+                          ? 'bg-stone-900 text-white border-stone-900 shadow-sm'
+                          : 'bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100'
+                      }`}
+                    >
+                      <div className="text-[11px]">{lang.native}</div>
+                      <div className="text-[9px] opacity-70 uppercase tracking-wider">{lang.label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Auto-Configuration Summary Card */}
+              <div className="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200/80 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center font-black">
+                    <Gauge className="w-4 h-4" />
                   </div>
-                  <div
-                    className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5 ${
-                      selectedRole === r.id ? 'border-[#A38258] bg-[#A38258]' : 'border-stone-300'
-                    }`}
-                  >
-                    {selectedRole === r.id && <Check className="w-2.5 h-2.5 text-white" />}
+                  <div>
+                    <span className="font-bold text-amber-950 block">
+                      Auto-Configured: {unitSystem === 'imperial' ? 'MPH (Miles/Hour)' : 'KM/H (Kilometers/Hour)'}
+                    </span>
+                    <span className="text-[10px] text-amber-800">
+                      Matched to {country} road standards
+                    </span>
                   </div>
                 </div>
-              ))}
+
+                <div className="flex items-center gap-1 bg-amber-100/80 p-0.5 rounded-lg border border-amber-300">
+                  <button
+                    type="button"
+                    onClick={() => setUnitSystem('imperial')}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all ${
+                      unitSystem === 'imperial' ? 'bg-amber-900 text-white' : 'text-amber-800 hover:text-amber-950'
+                    }`}
+                  >
+                    MPH
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUnitSystem('metric')}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all ${
+                      unitSystem === 'metric' ? 'bg-amber-900 text-white' : 'text-amber-800 hover:text-amber-950'
+                    }`}
+                  >
+                    KM/H
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-stone-100">
+            <div className="flex items-center justify-between pt-3 border-t border-stone-100">
               <button
                 type="button"
                 onClick={() => setStep('LOGIN')}
@@ -297,27 +449,61 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setStep('DETAILS')}
-                className="btn-gold px-4 py-2 rounded-xl text-xs cursor-pointer flex items-center gap-1.5"
+                onClick={() => {
+                  if (!city.trim()) {
+                    setErrorMsg('Please enter your city to proceed.');
+                    return;
+                  }
+                  setErrorMsg('');
+                  setStep('PROFILE');
+                }}
+                className="btn-gold px-4 py-2 rounded-xl text-xs cursor-pointer flex items-center gap-1.5 font-bold"
               >
-                <span>Next Step</span>
+                <span>Next: Profile Info</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP 3: Profile Details */}
-        {step === 'DETAILS' && (
+        {/* STEP 3: Profile Details & Role Questionnaire */}
+        {step === 'PROFILE' && (
           <div className="space-y-4">
             <div>
               <span className="text-[10px] text-[#A38258] uppercase font-bold tracking-widest font-mono">
-                Step 2 of 3 • Profile Details
+                Step 2 of 3 • Driver Profile
               </span>
-              <h3 className="text-lg font-bold text-stone-900 font-display mt-0.5">Driver & Contact Information</h3>
+              <h3 className="text-lg font-bold text-stone-900 font-display mt-0.5">Driver & Role Information</h3>
             </div>
 
             <div className="space-y-3">
+              {/* Role Selection */}
+              <div>
+                <label className="text-xs font-bold text-stone-700 block mb-1.5">Account Role</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'young_driver' as UserRole, label: 'Young Driver', desc: 'Licensed driver tracking habits' },
+                    { id: 'gdl_student' as UserRole, label: 'Permit Student', desc: '50-hour GDL licensing log' },
+                    { id: 'parent_mentor' as UserRole, label: 'Parent / Mentor', desc: 'Supervisory oversight' },
+                    { id: 'driving_instructor' as UserRole, label: 'Instructor', desc: 'Professional telematics scoring' }
+                  ].map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => setSelectedRole(r.id)}
+                      className={`p-2.5 rounded-xl text-left border cursor-pointer transition-all ${
+                        selectedRole === r.id
+                          ? 'border-[#C5A880] bg-[#C5A880]/10 text-stone-900 shadow-xs'
+                          : 'border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700'
+                      }`}
+                    >
+                      <div className="text-xs font-bold">{r.label}</div>
+                      <div className="text-[9px] text-stone-500 leading-tight mt-0.5">{r.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <label className="text-xs font-bold text-stone-700 block mb-1">Full Legal Name</label>
                 <input
@@ -329,9 +515,11 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-bold text-stone-700 block mb-1">Phone</label>
+                  <label className="text-xs font-bold text-stone-700 flex items-center gap-1 mb-1">
+                    <Phone className="w-3 h-3 text-[#A38258]" /> Phone (Optional)
+                  </label>
                   <input
                     type="tel"
                     value={phone}
@@ -341,7 +529,9 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-stone-700 block mb-1">Email</label>
+                  <label className="text-xs font-bold text-stone-700 flex items-center gap-1 mb-1">
+                    <Mail className="w-3 h-3 text-[#A38258]" /> Email (Optional)
+                  </label>
                   <input
                     type="email"
                     value={email}
@@ -354,20 +544,22 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
 
               {(selectedRole === 'young_driver' || selectedRole === 'gdl_student') && (
                 <div className="p-3 rounded-xl bg-stone-50 border border-stone-200 space-y-2">
-                  <span className="text-[10px] text-stone-500 uppercase font-bold block">Parent / Supervisor Contact</span>
-                  <div className="grid grid-cols-2 gap-2">
+                  <span className="text-[10px] text-stone-500 uppercase font-bold block">
+                    Parent / Supervisor Contact (For emergency alerts & circle)
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <input
                       type="text"
                       value={parentName}
                       onChange={(e) => setParentName(e.target.value)}
-                      placeholder="Parent Name"
+                      placeholder="Supervisor / Parent Name"
                       className="bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs text-stone-900 focus:outline-none"
                     />
                     <input
                       type="tel"
                       value={parentPhone}
                       onChange={(e) => setParentPhone(e.target.value)}
-                      placeholder="Parent Phone"
+                      placeholder="Supervisor Phone"
                       className="bg-white border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs text-stone-900 focus:outline-none"
                     />
                   </div>
@@ -378,7 +570,7 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
             <div className="flex items-center justify-between pt-2 border-t border-stone-100">
               <button
                 type="button"
-                onClick={() => setStep('ROLE')}
+                onClick={() => setStep('LOCATION')}
                 className="text-xs font-bold text-stone-500 hover:text-stone-900 cursor-pointer"
               >
                 Back
@@ -386,9 +578,9 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
               <button
                 type="button"
                 onClick={() => setStep('PREFERENCES')}
-                className="btn-gold px-4 py-2 rounded-xl text-xs cursor-pointer flex items-center gap-1.5"
+                className="btn-gold px-4 py-2 rounded-xl text-xs cursor-pointer flex items-center gap-1.5 font-bold"
               >
-                <span>Next Step</span>
+                <span>Next: Safety Settings</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -412,7 +604,7 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
               >
                 <div>
                   <span className="text-xs font-bold text-stone-900 block">Voice Safety Coach</span>
-                  <span className="text-[10px] text-stone-500">Real-time spoken feedback on sudden braking</span>
+                  <span className="text-[10px] text-stone-500">Real-time spoken feedback on sudden braking and high G-forces</span>
                 </div>
                 <input type="checkbox" checked={voiceAlerts} readOnly className="rounded text-[#A38258]" />
               </div>
@@ -423,16 +615,37 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
               >
                 <div>
                   <span className="text-xs font-bold text-stone-900 block">Automatic Trip Detection</span>
-                  <span className="text-[10px] text-stone-500">Auto-start sessions when vehicle motion is sensed</span>
+                  <span className="text-[10px] text-stone-500">Auto-start session recording when vehicle motion is sensed</span>
                 </div>
                 <input type="checkbox" checked={autoTripDetect} readOnly className="rounded text-[#A38258]" />
+              </div>
+            </div>
+
+            {/* Final Profile Verification Snapshot */}
+            <div className="p-3 rounded-xl bg-stone-100/70 border border-stone-200 text-xs space-y-1">
+              <div className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Account Summary</div>
+              <div className="flex justify-between font-mono text-stone-800 text-[11px]">
+                <span>Driver:</span>
+                <span className="font-bold">@{usernameInput.trim()}</span>
+              </div>
+              <div className="flex justify-between text-stone-800 text-[11px]">
+                <span>Location:</span>
+                <span className="font-semibold">{city}{stateProvince ? `, ${stateProvince}` : ''}, {country}</span>
+              </div>
+              <div className="flex justify-between text-stone-800 text-[11px]">
+                <span>Speed Telematics:</span>
+                <span className="font-bold text-[#A38258]">{unitSystem.toUpperCase()} ({unitSystem === 'imperial' ? 'MPH' : 'KM/H'})</span>
+              </div>
+              <div className="flex justify-between text-stone-800 text-[11px]">
+                <span>App Language:</span>
+                <span className="font-bold uppercase text-[#A38258]">{preferredLanguage}</span>
               </div>
             </div>
 
             <div className="flex items-center justify-between pt-3 border-t border-stone-100">
               <button
                 type="button"
-                onClick={() => setStep('DETAILS')}
+                onClick={() => setStep('PROFILE')}
                 className="text-xs font-bold text-stone-500 hover:text-stone-900 cursor-pointer"
               >
                 Back
@@ -441,7 +654,7 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
                 type="button"
                 onClick={handleCreateAccountFinal}
                 disabled={isSubmitting}
-                className="btn-gold px-5 py-2.5 rounded-xl text-xs cursor-pointer flex items-center gap-1.5"
+                className="btn-gold px-5 py-2.5 rounded-xl text-xs cursor-pointer flex items-center gap-1.5 font-bold"
               >
                 {isSubmitting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

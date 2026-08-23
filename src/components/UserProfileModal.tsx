@@ -1,7 +1,6 @@
 import React from 'react';
-import { User, Phone, Mail, Users, ShieldCheck, LogOut, X, Calendar } from 'lucide-react';
+import { User, Phone, Mail, LogOut, X, Calendar, MapPin, Globe, Gauge, Languages } from 'lucide-react';
 import { UserAccount } from '../lib/accountManager';
-import { RadianSymbol } from './RadianSymbol';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -22,7 +21,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="luxury-card max-w-md w-full p-6 sm:p-7 border border-[#C5A880]/30 shadow-2xl relative text-left text-stone-900">
+      <div className="luxury-card max-w-md w-full p-6 sm:p-7 border border-[#C5A880]/30 shadow-2xl relative text-left text-stone-900 max-h-[90vh] overflow-y-auto">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -52,6 +51,34 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             </div>
           </div>
 
+          {/* Location & Localization Info */}
+          <div className="p-3 rounded-xl bg-amber-50/50 border border-amber-200/60 text-xs space-y-1.5">
+            <div className="flex items-center justify-between text-stone-800">
+              <span className="flex items-center gap-1 text-stone-500 font-medium">
+                <MapPin className="w-3.5 h-3.5 text-[#A38258]" /> Region:
+              </span>
+              <span className="font-bold">
+                {account.city ? `${account.city}, ` : ''}{account.stateProvince ? `${account.stateProvince}, ` : ''}{account.country || 'Global'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-stone-800">
+              <span className="flex items-center gap-1 text-stone-500 font-medium">
+                <Gauge className="w-3.5 h-3.5 text-[#A38258]" /> Telematics Unit:
+              </span>
+              <span className="font-bold font-mono text-[#A38258]">
+                {account.unitSystem === 'metric' ? 'KM/H (Metric)' : 'MPH (Imperial)'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-stone-800">
+              <span className="flex items-center gap-1 text-stone-500 font-medium">
+                <Languages className="w-3.5 h-3.5 text-[#A38258]" /> App Language:
+              </span>
+              <span className="font-bold uppercase font-mono">
+                {account.preferredLanguage || 'en'}
+              </span>
+            </div>
+          </div>
+
           {/* Stats Bar */}
           <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-stone-50 border border-stone-200 text-center">
             <div>
@@ -63,8 +90,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <div className="text-base font-black text-stone-900 font-mono">{account.totalTrips}</div>
             </div>
             <div>
-              <div className="text-[9px] font-bold text-stone-400 uppercase">Logged Miles</div>
-              <div className="text-base font-black text-stone-900 font-mono">{account.totalDistanceMiles.toFixed(1)}</div>
+              <div className="text-[9px] font-bold text-stone-400 uppercase">
+                {account.unitSystem === 'metric' ? 'Logged KM' : 'Logged Miles'}
+              </div>
+              <div className="text-base font-black text-stone-900 font-mono">
+                {account.unitSystem === 'metric'
+                  ? (account.totalDistanceMiles * 1.60934).toFixed(1)
+                  : account.totalDistanceMiles.toFixed(1)}
+              </div>
             </div>
           </div>
 
@@ -88,7 +121,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             <span className="card-title block">Supervisor Key</span>
             <div className="p-3 rounded-xl bg-stone-50 border border-stone-200 text-xs flex items-center justify-between">
               <span className="text-stone-500">Pairing Code:</span>
-              <span className="font-mono font-bold text-[#A38258]">{account.supervisorCode}</span>
+              <span className="font-mono font-bold text-[#A38258]">{account.supervisorCode || '—'}</span>
             </div>
           </div>
 

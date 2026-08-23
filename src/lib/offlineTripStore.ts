@@ -47,13 +47,13 @@ export function getGdlProgress(username?: string): GdlProgress {
 
   return {
     requiredDayHours: 40,
-    completedDayHours: 14.5,
+    completedDayHours: 0,
     requiredNightHours: 10,
-    completedNightHours: 3.2,
+    completedNightHours: 0,
     totalRequiredHours: 50,
-    permitIssueDate: new Date(Date.now() - 60 * 86400000).toISOString().split('T')[0],
-    targetTestDate: new Date(Date.now() + 120 * 86400000).toISOString().split('T')[0],
-    supervisedTripsCount: 12
+    permitIssueDate: new Date().toISOString().split('T')[0],
+    targetTestDate: new Date(Date.now() + 180 * 86400000).toISOString().split('T')[0],
+    supervisedTripsCount: 0
   };
 }
 

@@ -2,7 +2,6 @@ import { createClient } from '@supabase/supabase-js';
 import { applySecurityHeaders, enforceRateLimit, sanitizeString, maskPiiAccount } from './_security';
 
 function getSupabaseServerClient(req?: any) {
-  // Check request headers first (passed from frontend if configured in UI), then process.env
   const headerUrl = req?.headers?.['x-supabase-url'] || req?.headers?.['authorization-url'];
   const headerKey = req?.headers?.['x-supabase-key'] || req?.headers?.['authorization-key'];
 
@@ -68,7 +67,7 @@ export default async function handler(req: any, res: any) {
     }
 
     try {
-      const { data, error } = await supabase.from('driver_accounts').select('username').limit(1);
+      const { error } = await supabase.from('driver_accounts').select('username').limit(1);
       if (error) {
         return res.status(200).json({
           status: 'error',
@@ -158,6 +157,11 @@ export default async function handler(req: any, res: any) {
           fullName: data.full_name,
           phone: data.phone,
           email: data.email,
+          city: data.city || '',
+          stateProvince: data.state_province || '',
+          country: data.country || '',
+          preferredLanguage: data.preferred_language || 'en',
+          unitSystem: data.unit_system || 'imperial',
           parentName: data.parent_name,
           parentPhone: data.parent_phone,
           parentEmail: data.parent_email,
@@ -198,6 +202,11 @@ export default async function handler(req: any, res: any) {
             fullName: item.full_name,
             phone: item.phone,
             email: item.email,
+            city: item.city || '',
+            stateProvince: item.state_province || '',
+            country: item.country || '',
+            preferredLanguage: item.preferred_language || 'en',
+            unitSystem: item.unit_system || 'imperial',
             parentName: item.parent_name,
             parentPhone: item.parent_phone,
             parentEmail: item.parent_email,
@@ -241,6 +250,11 @@ export default async function handler(req: any, res: any) {
     const cleanFullName = sanitizeString(rawAccount.fullName || rawAccount.username, 80);
     const cleanPhone = sanitizeString(rawAccount.phone || '', 25);
     const cleanEmail = sanitizeString(rawAccount.email || '', 100);
+    const cleanCity = sanitizeString(rawAccount.city || '', 80);
+    const cleanStateProvince = sanitizeString(rawAccount.stateProvince || '', 80);
+    const cleanCountry = sanitizeString(rawAccount.country || '', 80);
+    const cleanPreferredLanguage = sanitizeString(rawAccount.preferredLanguage || 'en', 10);
+    const cleanUnitSystem = rawAccount.unitSystem === 'metric' ? 'metric' : 'imperial';
     const cleanParentName = sanitizeString(rawAccount.parentName || '', 80);
     const cleanParentPhone = sanitizeString(rawAccount.parentPhone || '', 25);
     const cleanParentEmail = sanitizeString(rawAccount.parentEmail || '', 100);
@@ -269,6 +283,11 @@ export default async function handler(req: any, res: any) {
           fullName: cleanFullName,
           phone: cleanPhone,
           email: cleanEmail,
+          city: cleanCity,
+          stateProvince: cleanStateProvince,
+          country: cleanCountry,
+          preferredLanguage: cleanPreferredLanguage,
+          unitSystem: cleanUnitSystem,
           parentName: cleanParentName,
           parentPhone: cleanParentPhone,
           parentEmail: cleanParentEmail,
@@ -278,8 +297,8 @@ export default async function handler(req: any, res: any) {
           totalDistanceMiles: Math.max(0, Number(rawAccount.totalDistanceMiles) || 0),
           points: Math.max(0, Number(rawAccount.points) || 0),
           level: Math.max(1, Number(rawAccount.level) || 1),
-          currentXp: Math.max(0, Number(rawAccount.currentXp) || 0),
-          nextLevelXp: Math.max(100, Number(rawAccount.nextLevelXp) || 1000),
+          current_xp: Math.max(0, Number(rawAccount.currentXp) || 0),
+          next_level_xp: Math.max(100, Number(rawAccount.nextLevelXp) || 1000),
           badgesUnlocked: Array.isArray(rawAccount.badgesUnlocked) ? rawAccount.badgesUnlocked.slice(0, 30) : ['BRONZE_GUARDIAN'],
           tripHistory: Array.isArray(rawAccount.tripHistory) ? rawAccount.tripHistory.slice(0, 50) : []
         },
@@ -340,6 +359,18 @@ export default async function handler(req: any, res: any) {
         supabaseSaved: false,
         message: err.message || 'Supabase write failure'
       });
+    }
+  }
+
+  if (req.method === 'DELETE') {
+    if (!supabase) {
+      return res.status(200).json({ status: 'success', message: 'Local reset complete' });
+    }
+    try {
+      await supabase.from('driver_accounts').delete().neq('username', '__keep_schema__');
+      return res.status(200).json({ status: 'success', message: 'All cloud accounts purged' });
+    } catch (err: any) {
+      return res.status(500).json({ status: 'error', message: err.message });
     }
   }
 
