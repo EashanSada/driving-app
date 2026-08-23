@@ -15,6 +15,7 @@ import { DatabaseStatusModal } from './components/DatabaseStatusModal';
 import { LuxurySplashScreen } from './components/LuxurySplashScreen';
 import { LanguageCode, NavTab, UnitSystem } from './types';
 import { fetchAccountFromSupabase, getAccount, getActiveUsername, UserAccount } from './lib/accountManager';
+import { initializeNativeAppShell, NativeHaptics } from './lib/nativeMobileBridge';
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -45,6 +46,9 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Initialize Native App Shell for Capacitor / Android / iOS
+    initializeNativeAppShell();
+
     // Check if Native Android Bridge is present
     if (typeof (window as any).AndroidBridge !== 'undefined') {
       setHasNativeBridge(true);
@@ -88,6 +92,7 @@ export default function App() {
       applyAccountPreferences(acc);
     }
     setIsLoginModalOpen(false);
+    NativeHaptics.success();
   };
 
   const handleLogout = () => {
@@ -110,6 +115,7 @@ export default function App() {
       setActiveAccount(refreshed);
       applyAccountPreferences(refreshed);
     }
+    NativeHaptics.success();
     setActiveTab('analysis');
   };
 
@@ -147,7 +153,10 @@ export default function App() {
       {/* Sticky Top Luxury Header */}
       <NavigationHeader
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          NativeHaptics.light();
+          setActiveTab(tab);
+        }}
         currentLanguage={currentLanguage}
         setLanguage={handleSetLanguage}
         unitSystem={unitSystem}
@@ -156,6 +165,7 @@ export default function App() {
         activeAccount={activeAccount}
         onOpenDbModal={() => setIsDbModalOpen(true)}
         onOpenLoginModal={() => {
+          NativeHaptics.light();
           if (activeUsername && activeAccount) {
             setIsProfileModalOpen(true);
           } else {

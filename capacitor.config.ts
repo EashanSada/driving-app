@@ -1,0 +1,35 @@
+import { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'com.radiandrive.app',
+  appName: 'RadianDrive',
+  webDir: 'dist',
+  server: {
+    androidScheme: 'https',
+    cleartext: true
+  },
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 1800,
+      launchAutoHide: true,
+      backgroundColor: '#FBF9F5',
+      androidSplashResourceName: 'splash',
+      androidScaleType: 'CENTER_CROP',
+      showSpinner: false,
+      splashFullScreen: true,
+      splashImmersive: true
+    },
+    StatusBar: {
+      style: 'DARK',
+      backgroundColor: '#FBF9F5',
+      overlaysWebView: false
+    },
+    Geolocation: {
+      requestAlwaysPermission: true
+    },
+    Haptics: {},
+    Motion: {}
+  }
+};
+
+export default config;

@@ -24,6 +24,7 @@ import { recordTripForActiveUser, getActiveUsername, getAccount } from '../lib/a
 import { soundManager } from '../lib/soundAlerts';
 import { TripHistoryReplayModal } from './TripHistoryReplayModal';
 import { RadianSymbol } from './RadianSymbol';
+import { NativeHaptics, keepScreenAwake } from '../lib/nativeMobileBridge';
 
 interface TelematicsHudViewProps {
   currentLanguage: LanguageCode;
@@ -94,11 +95,13 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
       engine.subscribe((state: TelematicsState) => {
         setHudData({ ...state });
 
-        // Real-time voice safety feedback
+        // Real-time voice safety feedback & native haptics
         if (state.harshBrakingCount > 0 && Math.abs(state.jerkMs3) > 2.8) {
+          NativeHaptics.heavy();
           soundManager.playChime('WARNING');
           soundManager.speak('Sudden braking detected. Maintain a smooth follow distance.');
         } else if (state.gForceMag > 0.65) {
+          NativeHaptics.warning();
           soundManager.playChime('WARNING');
           soundManager.speak('Moderate turning speed for optimal stability.');
         }
@@ -112,6 +115,7 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
             if (highSpeedStreakRef.current >= 3) {
               highSpeedStreakRef.current = 0;
               handleStartTracking(false);
+              NativeHaptics.medium();
               soundManager.playChime('START');
               soundManager.speak('Driving movement detected. Safety session started.');
             }
@@ -124,6 +128,7 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
             if (stoppedStreakRef.current >= 25) {
               stoppedStreakRef.current = 0;
               handleStopTracking();
+              NativeHaptics.success();
               soundManager.playChime('STOP');
               soundManager.speak('Vehicle parked. Driving session recorded.');
             }
@@ -135,6 +140,7 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
 
       return () => {
         engine.stopTracking();
+        keepScreenAwake(false);
       };
     }
   }, [autoDetectEnabled]);
@@ -143,6 +149,8 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
     if (telematicsEngineRef.current) {
       telematicsEngineRef.current.startTracking(demoMode);
       setIsTracking(true);
+      keepScreenAwake(true);
+      NativeHaptics.medium();
       soundManager.playChime('START');
     }
   };
@@ -151,6 +159,8 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
     if (telematicsEngineRef.current) {
       const summary = telematicsEngineRef.current.stopTracking();
       setIsTracking(false);
+      keepScreenAwake(false);
+      NativeHaptics.success();
 
       const enrichedSummary = {
         ...summary,
