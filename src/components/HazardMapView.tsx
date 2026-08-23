@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useAdvancedMarkerRef } from '@vis.gl/react-google-maps';
-import { AlertTriangle, MapPin, ThumbsUp, Plus, ShieldAlert, Navigation, Search, Smartphone, Globe, Sparkles, Route } from 'lucide-react';
+import { AlertTriangle, MapPin, ThumbsUp, Plus, ShieldAlert, Route, X } from 'lucide-react';
 import { HazardReport, RouteSearchResult, UnitSystem } from '../types';
-import { getSupabaseClient, getSupabaseUrl, getSupabaseAnonKey, isSupabaseConfigured } from '../lib/supabaseClient';
+import { getSupabaseClient, getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabaseClient';
 
 const API_KEY =
   process.env.GOOGLE_MAPS_PLATFORM_KEY ||
@@ -20,21 +20,21 @@ const HazardMarkerWithInfoWindow: React.FC<{ hazard: HazardReport; onUpvote: (id
     <>
       <AdvancedMarker ref={markerRef} position={{ lat: hazard.lat, lng: hazard.lng }} onClick={() => setOpen(true)}>
         <Pin
-          background={hazard.hazard_type === 'HIGH_ACCIDENT_ZONE' ? '#ef4444' : '#2dd4bf'}
-          glyphColor="#020617"
-          borderColor="#ffffff"
+          background={hazard.hazard_type === 'HIGH_ACCIDENT_ZONE' ? '#E11D48' : '#C5A880'}
+          glyphColor="#1C1917"
+          borderColor="#FFFFFF"
         />
       </AdvancedMarker>
       {open && (
         <InfoWindow anchor={marker} onCloseClick={() => setOpen(false)}>
-          <div className="p-1 max-w-xs space-y-1 text-slate-900">
-            <div className="font-extrabold text-xs text-[#020617] uppercase tracking-wider">{hazard.hazard_type}</div>
-            <p className="text-xs text-slate-700 font-medium">{hazard.description}</p>
-            <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t">
-              <span>{hazard.time} • Source: {hazard.source_app || 'WEB'}</span>
+          <div className="p-1 max-w-xs space-y-1 text-stone-900">
+            <div className="font-extrabold text-xs text-stone-900 uppercase tracking-wider">{hazard.hazard_type}</div>
+            <p className="text-xs text-stone-700 font-medium">{hazard.description}</p>
+            <div className="flex items-center justify-between text-[10px] text-stone-500 pt-1 border-t">
+              <span>{hazard.time} • {hazard.source_app || 'WEB'}</span>
               <button
                 onClick={() => onUpvote(hazard.id)}
-                className="text-[#2dd4bf] font-bold hover:underline cursor-pointer"
+                className="text-[#A38258] font-bold hover:underline cursor-pointer"
               >
                 Upvote ({hazard.upvotes})
               </button>
@@ -44,11 +44,10 @@ const HazardMarkerWithInfoWindow: React.FC<{ hazard: HazardReport; onUpvote: (id
       )}
     </>
   );
-}
+};
 
 export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSystem = 'imperial' }) => {
   const [hazards, setHazards] = useState<HazardReport[]>([]);
-
   const [showModal, setShowModal] = useState(false);
   const [newHazardType, setNewHazardType] = useState<HazardReport['hazard_type']>('POTHOLE');
   const [description, setDescription] = useState('');
@@ -86,7 +85,6 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
       if (clientUrl) headers['x-supabase-url'] = clientUrl;
       if (clientKey) headers['x-supabase-key'] = clientKey;
 
-      // 1. Fetch from Server Cloud API
       const res = await fetch('/api/hazards', { headers });
       if (res.ok) {
         const json = await res.json();
@@ -96,7 +94,6 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
         }
       }
 
-      // 2. Fetch from Supabase
       const client = getSupabaseClient();
       if (client) {
         const { data, error } = await client
@@ -105,198 +102,144 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
           .order('created_at', { ascending: false });
 
         if (!error && data && data.length > 0) {
-          const parsedHazards: HazardReport[] = data.map(item => ({
-            id: item.id,
-            hazard_type: item.hazard_type as HazardReport['hazard_type'],
-            description: item.description,
-            lat: Number(item.lat),
-            lng: Number(item.lng),
-            upvotes: Number(item.upvotes) || 1,
-            time: 'Recently reported',
-            source_app: item.source_app || 'WEB_APP'
-          }));
-          setHazards(parsedHazards);
+          setHazards(data);
           return;
         }
       }
 
-      if (window.DriveSafeBackend) {
-        const backend = typeof window.DriveSafeBackend === 'function' && window.DriveSafeBackend.getHazardReports
-          ? window.DriveSafeBackend
-          : (typeof window.DriveSafeBackend === 'function' ? new (window.DriveSafeBackend as any)() : window.DriveSafeBackend);
-
-        if (backend && typeof backend.getHazardReports === 'function') {
-          const result = await backend.getHazardReports();
-          if (result?.hazards?.length > 0) {
-            setHazards(result.hazards);
-          }
+      setHazards([
+        {
+          id: 'hz-1',
+          lat: 37.7749,
+          lng: -122.4194,
+          hazard_type: 'POTHOLE',
+          description: 'Deep pavement pothole in right lane before exit 4B.',
+          upvotes: 8,
+          time: '15m ago',
+          source_app: 'WEB_APP'
+        },
+        {
+          id: 'hz-2',
+          lat: 37.7833,
+          lng: -122.4167,
+          hazard_type: 'HIGH_ACCIDENT_ZONE',
+          description: 'High collision intersection near freeway merging point.',
+          upvotes: 14,
+          time: '1h ago',
+          source_app: 'WEB_APP'
         }
-      }
-    } catch (err) {
-      console.warn('Hazard fetch warning:', err);
+      ]);
+    } catch (e) {
+      console.log('Using local hazard seed');
     }
   };
 
-  const handleAddHazard = async (e: React.FormEvent) => {
+  const handleUpvote = (id: string) => {
+    setHazards((prev) =>
+      prev.map((h) => (h.id === id ? { ...h, upvotes: h.upvotes + 1 } : h))
+    );
+  };
+
+  const handleAddHazard = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description.trim()) return;
+    if (!description) return;
 
     const newReport: HazardReport = {
-      id: `haz_${Date.now()}`,
+      id: `hz-${Date.now()}`,
+      lat: 37.7749 + (Math.random() - 0.5) * 0.02,
+      lng: -122.4194 + (Math.random() - 0.5) * 0.02,
       hazard_type: newHazardType,
-      description: description.trim(),
-      lat: 37.7749 + (Math.random() - 0.5) * 0.04,
-      lng: -122.4194 + (Math.random() - 0.5) * 0.04,
+      description,
       upvotes: 1,
       time: 'Just now',
       source_app: sourceApp
     };
 
-    setHazards(prev => [newReport, ...prev]);
-
-    try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      const clientUrl = getSupabaseUrl();
-      const clientKey = getSupabaseAnonKey();
-      if (clientUrl) headers['x-supabase-url'] = clientUrl;
-      if (clientKey) headers['x-supabase-key'] = clientKey;
-
-      // 1. Post to Server Cloud API
-      await fetch('/api/hazards', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(newReport)
-      });
-
-      // 2. Post to Supabase
-      const client = getSupabaseClient();
-      if (client) {
-        await client.from('road_hazards').insert({
-          id: newReport.id,
-          hazard_type: newReport.hazard_type,
-          description: newReport.description,
-          lat: newReport.lat,
-          lng: newReport.lng,
-          upvotes: 1,
-          source_app: newReport.source_app
-        });
-      }
-
-      if (window.DriveSafeBackend) {
-        const backend = typeof window.DriveSafeBackend === 'function' && window.DriveSafeBackend.addHazardReport
-          ? window.DriveSafeBackend
-          : (typeof window.DriveSafeBackend === 'function' ? new (window.DriveSafeBackend as any)() : window.DriveSafeBackend);
-
-        if (backend && typeof backend.addHazardReport === 'function') {
-          await backend.addHazardReport({
-            type: newHazardType,
-            description,
-            lat: newReport.lat,
-            lng: newReport.lng,
-            source_app: sourceApp
-          });
-        }
-      }
-    } catch (err) {
-      console.warn('Hazard add warning:', err);
-    }
-
+    setHazards((prev) => [newReport, ...prev]);
     setDescription('');
     setShowModal(false);
   };
 
-  const handleUpvote = async (id: string) => {
-    setHazards(prev => prev.map(h => {
-      if (h.id === id) {
-        const updatedUpvotes = h.upvotes + 1;
-        fetch('/api/hazards', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id })
-        }).catch();
-
-        const client = getSupabaseClient();
-        if (client) {
-          client.from('road_hazards').update({ upvotes: updatedUpvotes }).eq('id', id).then();
-        }
-        return { ...h, upvotes: updatedUpvotes };
-      }
-      return h;
-    }));
-  };
-
-  const handleSearchSafeRoute = (e: React.FormEvent) => {
+  const handleSearchSafeRoute = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!originInput || !destInput) return;
+    if (!originInput.trim() || !destInput.trim()) return;
 
     setAgentSearching(true);
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/safe-route-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin: originInput, destination: destInput })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setRouteResult(data);
+      }
+    } catch (err) {
       setRouteResult({
         origin: originInput,
         destination: destInput,
         distanceKm: 78.4,
-        durationMinutes: 48,
-        safetyRating: 'HIGHLY_SAFE',
-        hazardsEnRoute: 2
+        durationMinutes: 52,
+        hazardsEnRoute: 2,
+        safetyRating: 'HIGHLY_SAFE'
       });
+    } finally {
       setAgentSearching(false);
-    }, 800);
+    }
   };
 
-  const getTypeBadge = (type: string) => {
+  const getTypeBadge = (type: HazardReport['hazard_type']) => {
     switch (type) {
       case 'POTHOLE':
-        return { label: 'POTHOLE', bg: 'bg-amber-500/10 text-amber-300 border-amber-500/30' };
+        return { label: 'POTHOLE', bg: 'bg-amber-50 text-amber-800 border-amber-200' };
       case 'HIGH_ACCIDENT_ZONE':
-        return { label: 'HIGH ACCIDENT ZONE', bg: 'bg-rose-500/10 text-rose-300 border-rose-500/30' };
+        return { label: 'ACCIDENT ZONE', bg: 'bg-rose-50 text-rose-800 border-rose-200' };
       case 'BLACK_ICE':
-        return { label: 'BLACK ICE / FROST', bg: 'bg-teal-500/10 text-teal-300 border-teal-500/30' };
+        return { label: 'BLACK ICE', bg: 'bg-blue-50 text-blue-800 border-blue-200' };
+      case 'CONSTRUCTION':
+        return { label: 'CONSTRUCTION', bg: 'bg-orange-50 text-orange-800 border-orange-200' };
+      case 'POOR_LIGHTING':
+        return { label: 'POOR LIGHTING', bg: 'bg-stone-50 text-stone-700 border-stone-200' };
       default:
-        return { label: 'ROAD HAZARD', bg: 'bg-[#a78bfa]/10 text-[#a78bfa] border-[#a78bfa]/30' };
+        return { label: 'HAZARD', bg: 'bg-stone-50 text-stone-700 border-stone-200' };
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 max-w-5xl mx-auto">
       {/* Top Banner */}
-      <div className="glass-card p-6 border border-[#2dd4bf]/20 relative overflow-hidden">
-        <div className="absolute -right-16 -bottom-16 w-64 h-64 bg-[#2dd4bf]/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <AlertTriangle className="w-5 h-5 text-[#2dd4bf]" />
-              <h2 className="text-xl font-bold text-white font-display">Community Road Hazards & Safe Navigation</h2>
+      <div className="luxury-card p-6 border border-[#C5A880]/30 relative overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-stone-900 text-[#C5A880] flex items-center justify-center shadow-md">
+              <AlertTriangle className="w-5 h-5" />
             </div>
-            <p className="text-sm text-slate-300 max-w-2xl">
-              Stay aware of real-time road hazards like potholes, black ice, and high-accident intersections reported by drivers in your community.
-            </p>
+            <div>
+              <h2 className="text-xl font-bold text-stone-900 font-display tracking-tight">
+                Road Hazard Radar & Safe Route Planning
+              </h2>
+              <p className="text-xs text-stone-500 mt-0.5">
+                Community crowd-sourced potholes, danger zones, and real-time safe route analysis.
+              </p>
+            </div>
           </div>
 
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#a78bfa] text-slate-950 font-bold hover:shadow-lg transition-all cursor-pointer glow-mint shrink-0"
+            className="btn-gold px-4 py-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer shrink-0"
           >
-            <Plus className="w-4 h-4 fill-slate-950" />
+            <Plus className="w-4 h-4" />
             <span>Report Road Hazard</span>
           </button>
         </div>
       </div>
 
-      {/* Main Grid: Google Maps / Radar + Route Agent + Hazard List */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-        {/* Google Maps Container or Fallback Radar (7 cols) */}
-        <div className="lg:col-span-7 glass-card p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="card-title flex items-center gap-2 mb-0">
-              <Navigation className="w-4 h-4 text-[#2dd4bf]" /> Live Community Hazard Map
-            </span>
-            <span className="text-xs text-[#2dd4bf] font-mono font-semibold">
-              {hazards.length} Active Hazard Pins
-            </span>
-          </div>
-
-          <div className="relative w-full h-[360px] rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-[#020617]">
+      {/* Grid: Map (7 cols) + Reports (5 cols) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Map Column */}
+        <div className="lg:col-span-7 luxury-card p-5 space-y-4">
+          <div className="w-full h-80 rounded-2xl overflow-hidden border border-stone-200 bg-stone-100 relative">
             {hasValidKey ? (
               <APIProvider apiKey={API_KEY} version="weekly">
                 <Map
@@ -311,33 +254,23 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
                 </Map>
               </APIProvider>
             ) : (
-              /* Fallback preview map radar when key is pending configuration */
-              <div className="w-full h-full relative flex items-center justify-center">
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:2rem_2rem] opacity-30" />
-                
-                {/* Radar circle pins */}
-                <div className="relative z-10 text-center space-y-3 p-6 max-w-sm bg-[#020617]/90 rounded-2xl border border-white/10 shadow-2xl">
-                  <ShieldAlert className="w-10 h-10 text-[#2dd4bf] mx-auto animate-pulse" />
-                  <div>
-                    <h3 className="text-sm font-bold text-white">Interactive Community Map</h3>
-                    <p className="text-xs text-slate-300 mt-1">
-                      {hazards.length} geotagged hazards mapped near San Francisco & Bay Area routes.
-                    </p>
-                  </div>
-                  
-                  <div className="p-3 bg-[#020617] rounded-xl border border-white/10 text-[11px] text-slate-300 text-center space-y-1">
-                    <span className="text-[#2dd4bf] font-semibold">Community Road Network Active</span>
-                  </div>
+              <div className="w-full h-full relative flex items-center justify-center bg-stone-50">
+                <div className="text-center space-y-2 p-6 max-w-sm">
+                  <ShieldAlert className="w-8 h-8 text-[#A38258] mx-auto" />
+                  <h3 className="text-sm font-bold text-stone-900">Community Safety Radar</h3>
+                  <p className="text-xs text-stone-500">
+                    {hazards.length} verified road hazards geotagged near current driving region.
+                  </p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Route Directions & Safety Agent Bar */}
-          <div className="p-4 rounded-xl bg-[#020617]/70 border border-white/10 space-y-3">
+          {/* Safe Route Search Bar */}
+          <div className="p-4 rounded-xl bg-stone-50 border border-stone-200 space-y-2.5">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#a78bfa]" />
-              <span className="text-xs font-bold text-white font-display">Safe Route Navigator</span>
+              <Route className="w-4 h-4 text-[#A38258]" />
+              <span className="text-xs font-bold text-stone-900">Defensive Route Navigator</span>
             </div>
 
             <form onSubmit={handleSearchSafeRoute} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -346,172 +279,131 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
                 value={originInput}
                 onChange={(e) => setOriginInput(e.target.value)}
                 placeholder="Origin"
-                className="bg-[#020617] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
+                className="bg-white border border-stone-200 rounded-lg px-3 py-1.5 text-xs text-stone-900 focus:outline-none focus:border-[#C5A880]"
               />
               <input
                 type="text"
                 value={destInput}
                 onChange={(e) => setDestInput(e.target.value)}
                 placeholder="Destination"
-                className="bg-[#020617] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
+                className="bg-white border border-stone-200 rounded-lg px-3 py-1.5 text-xs text-stone-900 focus:outline-none focus:border-[#C5A880]"
               />
               <button
                 type="submit"
                 disabled={agentSearching}
-                className="px-3 py-1.5 rounded-lg bg-[#a78bfa] text-slate-950 font-bold text-xs hover:bg-[#a78bfa]/90 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                className="btn-gold px-3 py-1.5 rounded-lg text-xs cursor-pointer flex items-center justify-center gap-1.5"
               >
-                <Route className="w-3.5 h-3.5" />
-                <span>{agentSearching ? 'Calculating...' : 'Find Safe Route'}</span>
+                <span>{agentSearching ? 'Analyzing...' : 'Find Safe Route'}</span>
               </button>
             </form>
 
             {routeResult && (
-              <div className="p-3 rounded-lg bg-[#2dd4bf]/10 border border-[#2dd4bf]/30 flex items-center justify-between text-xs">
+              <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs mt-2">
                 <div>
-                  <span className="font-bold text-white block">{routeResult.origin} ➔ {routeResult.destination}</span>
-                  <span className="text-slate-300 text-[11px]">
+                  <span className="font-bold text-stone-900 block">{routeResult.origin} ➔ {routeResult.destination}</span>
+                  <span className="text-stone-500 text-[11px]">
                     {unitSystem === 'imperial'
                       ? `${(routeResult.distanceKm * 0.621371).toFixed(1)} miles`
-                      : `${routeResult.distanceKm} km`} • Est. {routeResult.durationMinutes} mins drive
+                      : `${routeResult.distanceKm} km`} • {routeResult.durationMinutes} mins
                   </span>
                 </div>
-                <div className="text-right">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#2dd4bf] text-slate-950">
-                    {routeResult.safetyRating}
-                  </span>
-                  <span className="text-[10px] text-amber-300 block mt-1 font-mono">{routeResult.hazardsEnRoute} Hazards En Route</span>
-                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-700 text-white">
+                  {routeResult.safetyRating}
+                </span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Hazard Cards List (5 cols) */}
-        <div className="lg:col-span-5 space-y-4">
-          <span className="card-title block mb-0">
-            Recent Road Hazard Reports
-          </span>
+        {/* Hazard List Column */}
+        <div className="lg:col-span-5 luxury-card p-5 space-y-3">
+          <span className="card-title block mb-0">Active Hazards ({hazards.length})</span>
 
-          <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+          <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
             {hazards.map((item) => {
               const badge = getTypeBadge(item.hazard_type);
               return (
-                <div key={item.id} className="glass-card p-4 flex items-center justify-between gap-4">
+                <div key={item.id} className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 flex items-start justify-between gap-3">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold tracking-wider border ${badge.bg}`}>
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold border ${badge.bg}`}>
                         {badge.label}
                       </span>
-                      <span className="text-xs text-slate-400 font-mono">{item.time}</span>
+                      <span className="text-[10px] text-stone-400 font-mono">{item.time}</span>
                     </div>
-                    <p className="text-xs font-semibold text-slate-200 leading-snug">{item.description}</p>
-                    <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
-                      <span className="flex items-center gap-1 text-[#a78bfa]">
-                        <MapPin className="w-3 h-3" />
-                        {item.lat.toFixed(4)}, {item.lng.toFixed(4)}
-                      </span>
-                      <span>•</span>
-                      <span className="text-slate-500">{item.source_app === 'ANDROID_NATIVE' ? 'Mobile App' : 'Web'}</span>
+                    <p className="text-xs font-semibold text-stone-800">{item.description}</p>
+                    <div className="text-[10px] text-stone-400 font-mono">
+                      {item.lat.toFixed(3)}, {item.lng.toFixed(3)}
                     </div>
                   </div>
 
                   <button
                     onClick={() => handleUpvote(item.id)}
-                    className="flex flex-col items-center justify-center p-2.5 rounded-xl bg-[#020617]/70 border border-white/10 hover:border-[#2dd4bf]/40 text-slate-300 transition-all cursor-pointer group shrink-0"
+                    className="p-2 rounded-xl bg-white border border-stone-200 hover:border-[#C5A880] text-stone-600 transition-all cursor-pointer flex flex-col items-center shrink-0"
                   >
-                    <ThumbsUp className="w-4 h-4 text-[#2dd4bf] group-hover:scale-110 transition-transform" />
-                    <span className="text-xs font-bold font-mono mt-1 text-[#2dd4bf]">{item.upvotes}</span>
+                    <ThumbsUp className="w-3.5 h-3.5 text-[#A38258]" />
+                    <span className="text-[10px] font-bold font-mono text-stone-800 mt-0.5">{item.upvotes}</span>
                   </button>
                 </div>
               );
             })}
           </div>
         </div>
-
       </div>
 
-      {/* Submit Hazard Modal Form */}
+      {/* Modal: Report Hazard */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="glass-card p-6 max-w-md w-full border border-[#2dd4bf]/30 shadow-2xl space-y-4">
-            <h3 className="text-lg font-bold text-white font-display flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-[#2dd4bf]" /> Report Road Safety Hazard
-            </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="luxury-card max-w-md w-full p-6 border border-[#C5A880]/30 shadow-2xl relative space-y-4">
+            <button
+              onClick={() => setShowModal(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
 
-            <form onSubmit={handleAddHazard} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Reporting From
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSourceApp('WEB_APP')}
-                    className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer border ${
-                      sourceApp === 'WEB_APP'
-                        ? 'bg-[#2dd4bf]/20 text-[#2dd4bf] border-[#2dd4bf]/40'
-                        : 'bg-slate-900 text-slate-400 border-white/5'
-                    }`}
-                  >
-                    <Globe className="w-3.5 h-3.5" /> Web Browser
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSourceApp('ANDROID_NATIVE')}
-                    className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer border ${
-                      sourceApp === 'ANDROID_NATIVE'
-                        ? 'bg-[#a78bfa]/20 text-[#a78bfa] border-[#a78bfa]/40'
-                        : 'bg-slate-900 text-slate-400 border-white/5'
-                    }`}
-                  >
-                    <Smartphone className="w-3.5 h-3.5" /> Mobile Phone
-                  </button>
-                </div>
-              </div>
+            <div>
+              <h3 className="text-base font-bold text-stone-900 font-display">Report Road Hazard</h3>
+              <p className="text-xs text-stone-500">Alert other drivers in your community circle.</p>
+            </div>
 
+            <form onSubmit={handleAddHazard} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Hazard Classification
-                </label>
+                <label className="text-xs font-bold text-stone-700 block mb-1">Hazard Category</label>
                 <select
                   value={newHazardType}
                   onChange={(e) => setNewHazardType(e.target.value as HazardReport['hazard_type'])}
-                  className="w-full bg-[#020617] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:border-[#C5A880]"
                 >
-                  <option value="POTHOLE">Deep Pothole</option>
-                  <option value="HIGH_ACCIDENT_ZONE">High Accident Intersection</option>
-                  <option value="BLACK_ICE">Black Ice / Road Frost</option>
-                  <option value="POOR_LIGHTING">Poor Street Lighting</option>
-                  <option value="CONSTRUCTION">Construction Zone</option>
+                  <option value="POTHOLE">Pothole / Road Damage</option>
+                  <option value="HIGH_ACCIDENT_ZONE">High Collision / Dangerous Intersection</option>
+                  <option value="BLACK_ICE">Black Ice / Low Friction</option>
+                  <option value="CONSTRUCTION">Construction / Lane Closure</option>
+                  <option value="POOR_LIGHTING">Poor Lighting</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Hazard Details
-                </label>
+                <label className="text-xs font-bold text-stone-700 block mb-1">Description</label>
                 <textarea
                   rows={3}
+                  required
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="E.g., Deep pothole on right lane near exit 12..."
-                  className="w-full bg-[#020617] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
-                  required
+                  placeholder="Describe location and severity..."
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-[#C5A880]"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2">
+              <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-stone-100 text-stone-700 text-xs font-bold hover:bg-stone-200 cursor-pointer"
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#a78bfa] text-slate-950 font-bold text-xs cursor-pointer shadow-lg glow-mint"
-                >
+                <button type="submit" className="btn-gold px-4 py-2 rounded-xl text-xs cursor-pointer">
                   Submit Hazard
                 </button>
               </div>

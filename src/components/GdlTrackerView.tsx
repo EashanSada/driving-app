@@ -7,14 +7,14 @@ import {
   Clock,
   Plus,
   ShieldCheck,
-  Award,
-  AlertCircle,
   FileCheck,
-  Calendar
+  Calendar,
+  X
 } from 'lucide-react';
 import { GdlProgress } from '../types';
 import { getGdlProgress, saveGdlProgress } from '../lib/offlineTripStore';
 import { getActiveUsername, getAccount } from '../lib/accountManager';
+import { RadianSymbol } from './RadianSymbol';
 
 export const GdlTrackerView: React.FC = () => {
   const activeUsername = getActiveUsername();
@@ -57,254 +57,221 @@ export const GdlTrackerView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 max-w-5xl mx-auto">
       {/* Top Banner */}
-      <div className="glass-card p-6 border border-[#2dd4bf]/20 relative overflow-hidden">
-        <div className="absolute -right-16 -bottom-16 w-64 h-64 bg-[#2dd4bf]/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <GraduationCap className="w-5 h-5 text-[#2dd4bf]" />
-              <h2 className="text-xl font-bold text-white font-display">
-                Graduated Driver Licensing (GDL) Tracker
-              </h2>
+      <div className="luxury-card p-6 border border-[#C5A880]/30 relative overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-stone-900 text-[#C5A880] flex items-center justify-center shadow-md">
+              <GraduationCap className="w-5 h-5" />
             </div>
-            <p className="text-sm text-slate-300 max-w-2xl">
-              Track your state-mandated supervised driving hours for {account?.fullName || activeUsername || 'Driver'}. Auto-logs trips from the HUD and calculates day vs. night driving requirements.
-            </p>
+            <div>
+              <h2 className="text-xl font-bold text-stone-900 font-display tracking-tight">
+                GDL Licensing Hours Tracker
+              </h2>
+              <p className="text-xs text-stone-500 mt-0.5">
+                Official 50-Hour state-mandated supervised driving hours for {account?.fullName || activeUsername || 'Permit Driver'}.
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">
             <button
               onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#020617] border border-white/15 hover:border-white/30 text-white font-bold text-xs transition-all cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-stone-50 border border-stone-200 hover:bg-stone-100 text-stone-700 font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
             >
-              <FileCheck className="w-4 h-4 text-[#a78bfa]" />
-              <span>Print / Save PDF Log</span>
+              <FileCheck className="w-4 h-4 text-[#A38258]" />
+              <span>Export Certificate (PDF)</span>
             </button>
 
             <button
               onClick={() => setShowLogModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#a78bfa] text-slate-950 font-bold text-xs hover:shadow-lg transition-all cursor-pointer glow-mint"
+              className="btn-gold px-4 py-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer"
             >
-              <Plus className="w-4 h-4 fill-slate-950" />
-              <span>Log Supervised Hours</span>
+              <Plus className="w-4 h-4 fill-stone-950" />
+              <span>Log Hours</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* Main GDL Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Overall Completion Metric Card (5 cols) */}
-        <div className="lg:col-span-5 glass-card p-6 space-y-6 flex flex-col justify-between">
-          <div className="text-center space-y-3">
-            <span className="card-title text-xs font-bold text-slate-300 uppercase block mb-0">
-              Total Licensing Hours Progress
-            </span>
-
-            <div className="flex items-center justify-center my-4">
-              <div className="relative flex flex-col items-center justify-center w-40 h-40 rounded-full bg-[#020617] border-4 border-[#2dd4bf]/40 shadow-2xl glow-mint">
-                <span className="text-3xl font-extrabold text-white font-mono">{totalCompleted}h</span>
-                <span className="text-[11px] font-bold uppercase tracking-widest text-[#2dd4bf] mt-0.5">
-                  of {progress.totalRequiredHours}h required
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono mt-1">{totalPercentage}% Complete</span>
-              </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Overall Progress Card (5 cols) */}
+        <div className="lg:col-span-5 luxury-card p-6 flex flex-col justify-between min-h-[320px]">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <span className="card-title mb-0">Total Supervised Hours</span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#C5A880]/15 text-[#A38258] border border-[#C5A880]/30 font-mono">
+                {totalPercentage}% Target
+              </span>
             </div>
 
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-[#2dd4bf]/10 text-[#2dd4bf] border border-[#2dd4bf]/30">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>{progress.supervisedTripsCount} Supervised Sessions Logged</span>
+            <div className="space-y-1">
+              <div className="text-4xl sm:text-5xl font-black text-stone-900 font-display tracking-tight">
+                {totalCompleted}{' '}
+                <span className="text-base font-normal text-stone-400">
+                  / {progress.totalRequiredHours} hrs
+                </span>
+              </div>
+              <p className="text-xs text-stone-500">
+                {Math.max(0, progress.totalRequiredHours - totalCompleted).toFixed(1)} hours remaining until road test qualification.
+              </p>
             </div>
           </div>
 
-          {/* Licensing Key Dates */}
-          <div className="space-y-2.5 pt-4 border-t border-white/10 text-xs">
-            <div className="flex justify-between text-slate-300">
-              <span className="flex items-center gap-1.5 text-slate-400">
-                <Calendar className="w-3.5 h-3.5 text-[#2dd4bf]" /> Permit Issue Date:
-              </span>
-              <span className="font-mono text-white font-bold">{progress.permitIssueDate}</span>
+          <div className="space-y-3 pt-4 border-t border-stone-100">
+            {/* Progress Bar */}
+            <div className="h-2.5 w-full bg-stone-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-[#C5A880] to-stone-900 rounded-full transition-all duration-500"
+                style={{ width: `${totalPercentage}%` }}
+              />
             </div>
-            <div className="flex justify-between text-slate-300">
-              <span className="flex items-center gap-1.5 text-slate-400">
-                <Calendar className="w-3.5 h-3.5 text-[#a78bfa]" /> Target Driving Test:
+
+            <div className="flex items-center justify-between text-[11px] text-stone-500">
+              <span>{progress.supervisedTripsCount} verified drives logged</span>
+              <span className="text-emerald-700 font-bold flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> State Compliant
               </span>
-              <span className="font-mono text-[#a78bfa] font-bold">{progress.targetTestDate}</span>
             </div>
           </div>
         </div>
 
-        {/* Day & Night Breakdown Cards (7 cols) */}
-        <div className="lg:col-span-7 space-y-4">
-          {/* Daytime Hours Card */}
-          <div className="glass-card p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                  <Sun className="w-4 h-4 text-amber-400" />
+        {/* Day vs Night Breakdown (7 cols) */}
+        <div className="lg:col-span-7 luxury-card p-6 space-y-4 flex flex-col justify-between">
+          <span className="card-title block">State Requirement Breakdown</span>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Daylight Driving */}
+            <div className="luxury-panel p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sun className="w-4 h-4 text-amber-500" />
+                  <span className="text-xs font-bold text-stone-900">Daytime Hours</span>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">Daytime Supervised Hours</h3>
-                  <p className="text-[11px] text-slate-400">Normal daylight road practice with adult supervisor</p>
-                </div>
+                <span className="text-xs font-bold font-mono text-stone-700">{dayPercentage}%</span>
               </div>
-              <div className="text-right">
-                <span className="text-base font-bold font-mono text-white">
-                  {progress.completedDayHours} / {progress.requiredDayHours}h
-                </span>
-                <span className="block text-[10px] text-amber-400 font-mono font-semibold">{dayPercentage}%</span>
+              <div className="text-2xl font-black text-stone-900 font-display">
+                {progress.completedDayHours}{' '}
+                <span className="text-xs font-normal text-stone-400">/ {progress.requiredDayHours}h</span>
+              </div>
+              <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden">
+                <div className="h-full bg-amber-500 rounded-full" style={{ width: `${dayPercentage}%` }} />
               </div>
             </div>
 
-            <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-white/10">
-              <div
-                className="bg-amber-400 h-full rounded-full transition-all duration-500"
-                style={{ width: `${dayPercentage}%` }}
-              />
+            {/* Nighttime Driving */}
+            <div className="luxury-panel p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Moon className="w-4 h-4 text-indigo-600" />
+                  <span className="text-xs font-bold text-stone-900">Nighttime Hours</span>
+                </div>
+                <span className="text-xs font-bold font-mono text-stone-700">{nightPercentage}%</span>
+              </div>
+              <div className="text-2xl font-black text-stone-900 font-display">
+                {progress.completedNightHours}{' '}
+                <span className="text-xs font-normal text-stone-400">/ {progress.requiredNightHours}h</span>
+              </div>
+              <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden">
+                <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${nightPercentage}%` }} />
+              </div>
             </div>
           </div>
 
-          {/* Nighttime Hours Card */}
-          <div className="glass-card p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-[#a78bfa]/10 border border-[#a78bfa]/30">
-                  <Moon className="w-4 h-4 text-[#a78bfa]" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">Nighttime Supervised Hours</h3>
-                  <p className="text-[11px] text-slate-400">Dusk and nighttime driving with low-light hazards</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className="text-base font-bold font-mono text-white">
-                  {progress.completedNightHours} / {progress.requiredNightHours}h
-                </span>
-                <span className="block text-[10px] text-[#a78bfa] font-mono font-semibold">{nightPercentage}%</span>
-              </div>
-            </div>
-
-            <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-white/10">
-              <div
-                className="bg-[#a78bfa] h-full rounded-full transition-all duration-500"
-                style={{ width: `${nightPercentage}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Licensing Readiness Checklist */}
-          <div className="p-4 rounded-xl bg-[#020617]/70 border border-white/10 space-y-2">
-            <span className="card-title text-xs font-bold text-slate-300 uppercase block mb-1">
-              State DMV Compliance Checklist
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              <div className="flex items-center gap-2 text-slate-300">
-                <CheckCircle2
-                  className={`w-4 h-4 ${
-                    progress.completedDayHours >= progress.requiredDayHours ? 'text-emerald-400' : 'text-slate-600'
-                  }`}
-                />
-                <span>40 Daytime Hours Complete</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-300">
-                <CheckCircle2
-                  className={`w-4 h-4 ${
-                    progress.completedNightHours >= progress.requiredNightHours
-                      ? 'text-emerald-400'
-                      : 'text-slate-600'
-                  }`}
-                />
-                <span>10 Nighttime Hours Complete</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-300">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Zero Harsh Incident Log Validated</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-300">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>Mentor Endorsement Ready</span>
-              </div>
-            </div>
+          <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 text-xs text-stone-600 flex items-center justify-between">
+            <span>Target Road Test Qualification Date:</span>
+            <span className="font-mono font-bold text-stone-900">{progress.targetTestDate}</span>
           </div>
         </div>
       </div>
 
-      {/* Manual Log Modal */}
+      {/* Manual Hour Entry Modal */}
       {showLogModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="glass-card p-6 max-w-md w-full border border-[#2dd4bf]/30 shadow-2xl space-y-4">
-            <h3 className="text-lg font-bold text-white font-display flex items-center gap-2">
-              <Clock className="w-5 h-5 text-[#2dd4bf]" /> Log Supervised Driving Practice
-            </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="luxury-card max-w-md w-full p-6 border border-[#C5A880]/30 shadow-2xl relative">
+            <button
+              onClick={() => setShowLogModal(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
 
             <form onSubmit={handleAddManualHours} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Session Type</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setLogType('DAY')}
-                    className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 cursor-pointer border ${
-                      logType === 'DAY'
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                        : 'bg-[#020617] border-white/10 text-slate-400'
-                    }`}
-                  >
-                    <Sun className="w-4 h-4" /> Daytime
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLogType('NIGHT')}
-                    className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 cursor-pointer border ${
-                      logType === 'NIGHT'
-                        ? 'bg-[#a78bfa]/20 border-[#a78bfa] text-[#a78bfa]'
-                        : 'bg-[#020617] border-white/10 text-slate-400'
-                    }`}
-                  >
-                    <Moon className="w-4 h-4" /> Nighttime
-                  </button>
+                <h3 className="text-base font-bold text-stone-900 font-display">Log Supervised Hours</h3>
+                <p className="text-xs text-stone-500">Record a supervised session with a parent or instructor.</p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">Session Duration (Hours)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    max="10"
+                    required
+                    value={logHours}
+                    onChange={(e) => setLogHours(e.target.value)}
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:border-[#C5A880]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">Driving Condition</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setLogType('DAY')}
+                      className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        logType === 'DAY'
+                          ? 'bg-amber-50 border-amber-300 text-amber-900'
+                          : 'bg-stone-50 border-stone-200 text-stone-500'
+                      }`}
+                    >
+                      <Sun className="w-3.5 h-3.5" /> Daytime
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLogType('NIGHT')}
+                      className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        logType === 'NIGHT'
+                          ? 'bg-indigo-50 border-indigo-300 text-indigo-900'
+                          : 'bg-stone-50 border-stone-200 text-stone-500'
+                      }`}
+                    >
+                      <Moon className="w-3.5 h-3.5" /> Nighttime
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">Supervisor Notes (Optional)</label>
+                  <textarea
+                    rows={2}
+                    value={mentorNotes}
+                    onChange={(e) => setMentorNotes(e.target.value)}
+                    placeholder="e.g. Highway merging and parallel parking practice"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-[#C5A880]"
+                  />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Duration (Hours)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0.5"
-                  max="8"
-                  value={logHours}
-                  onChange={(e) => setLogHours(e.target.value)}
-                  className="w-full bg-[#020617] border border-white/15 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Supervisor Notes</label>
-                <textarea
-                  value={mentorNotes}
-                  onChange={(e) => setMentorNotes(e.target.value)}
-                  placeholder="e.g. Highway merging and parallel parking practice"
-                  rows={2}
-                  className="w-full bg-[#020617] border border-white/15 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#2dd4bf]"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-2">
+              <div className="pt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowLogModal(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold transition-all cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-stone-100 text-stone-700 text-xs font-bold hover:bg-stone-200 transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-[#2dd4bf] text-slate-950 text-xs font-bold hover:shadow-lg transition-all cursor-pointer glow-mint"
+                  className="btn-gold px-4 py-2 rounded-xl text-xs cursor-pointer"
                 >
-                  Confirm Log
+                  Save Hours
                 </button>
               </div>
             </form>

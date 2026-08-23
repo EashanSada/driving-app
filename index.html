@@ -1,29 +1,29 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0f172a" />
-    <title>DriveSafe Youth Initiative | Non-Profit Driver Safety Platform</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#FBF9F5" />
+    <title>RadianDrive | Precision Telematics & Safety Platform</title>
 
-    <!-- Google Fonts: Plus Jakarta Sans & Inter -->
+    <!-- Luxury Typography: Syne, Plus Jakarta Sans, Cinzel & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Syne:wght@500;600;700;800&display=swap" rel="stylesheet">
 
     <!-- PWA Manifest & Mobile Web App Meta -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="DriveSafe" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="RadianDrive" />
     <link rel="apple-touch-icon" href="/icon-192.svg" />
     <link rel="icon" type="image/svg+xml" href="/icon-192.svg" />
 
-    <!-- Custom Glow & Glassmorphism Utilities -->
+    <!-- Custom Luxury Texture Styles -->
     <link rel="stylesheet" href="/css/styles.css" />
   </head>
-  <body class="bg-[#0f172a] text-slate-100 min-h-screen font-sans antialiased selection:bg-emerald-500 selection:text-slate-900">
+  <body class="bg-[#FBF9F5] text-stone-900 min-h-screen font-sans antialiased selection:bg-[#C5A880] selection:text-stone-950 overflow-x-hidden">
     <div id="root"></div>
 
     <!-- Vanilla JS Modular Telematics Libraries -->
@@ -34,16 +34,15 @@
     <!-- React Main App Entry -->
     <script type="module" src="/src/main.tsx"></script>
 
-    <!-- PWA Service Worker Registration & Cache Purge -->
+    <!-- PWA Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then(reg => {
               reg.update();
-              console.log('DriveSafe Service Worker updated:', reg.scope);
             })
-            .catch(err => console.log('Service Worker registration failed:', err));
+            .catch(err => console.log('Service Worker registration skipped:', err));
         });
       }
     </script>

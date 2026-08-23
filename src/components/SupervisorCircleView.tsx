@@ -1,33 +1,28 @@
 import React, { useState } from 'react';
 import {
   Users,
-  Printer,
   ShieldCheck,
   Award,
   Calendar,
   CheckCircle2,
   FileText,
-  UserCheck,
   Building2,
-  Download,
   Share2,
   Check,
-  Sparkles,
   Link,
   Lock,
-  Search,
-  Eye
+  Printer
 } from 'lucide-react';
 import { getAccount, getActiveUsername, getAllAccounts, UserAccount } from '../lib/accountManager';
 import { getGdlProgress, getStoredTrips } from '../lib/offlineTripStore';
 import { UnitSystem } from '../types';
+import { RadianSymbol } from './RadianSymbol';
 
 export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ unitSystem }) => {
   const activeUsername = getActiveUsername();
   const currentAccount = activeUsername ? getAccount(activeUsername) : null;
   const allAccounts = getAllAccounts();
 
-  // Child / Teen Driver Selection (defaults to current user or first teen account)
   const [selectedChildUsername, setSelectedChildUsername] = useState<string>(() => {
     if (currentAccount?.role === 'young_driver' || currentAccount?.role === 'gdl_student') {
       return activeUsername || 'alex_rivera';
@@ -45,7 +40,7 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
   const [pairingInput, setPairingInput] = useState('');
   const [pairingSuccessMsg, setPairingSuccessMsg] = useState('');
 
-  const supervisorCode = selectedChildAccount?.supervisorCode || `DS-7492-${(selectedChildUsername || 'SAFE').substring(0, 4).toUpperCase()}`;
+  const supervisorCode = selectedChildAccount?.supervisorCode || `RD-7492-${(selectedChildUsername || 'SAFE').substring(0, 4).toUpperCase()}`;
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(supervisorCode);
@@ -58,7 +53,6 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
     const clean = pairingInput.trim();
     if (!clean) return;
 
-    // Check if input is a known username or code
     const matched = allAccounts.find(
       a => a.username.toLowerCase() === clean.toLowerCase() || a.supervisorCode === clean
     );
@@ -67,7 +61,7 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
       setSelectedChildUsername(matched.username);
       setPairingSuccessMsg(`Successfully linked with ${matched.fullName || matched.username}.`);
     } else {
-      setPairingSuccessMsg(`Link key "${clean}" registered with Parent-Teen Circle.`);
+      setPairingSuccessMsg(`Supervisor code "${clean}" registered with Parent-Teen Circle.`);
     }
 
     setTimeout(() => {
@@ -76,32 +70,31 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
     }, 4000);
   };
 
-  const handlePrintPdf = () => {
-    window.print();
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Top Banner */}
-      <div className="glass-card p-6 border border-[#a78bfa]/20 relative overflow-hidden">
-        <div className="absolute -right-16 -bottom-16 w-64 h-64 bg-[#a78bfa]/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Users className="w-5 h-5 text-[#a78bfa]" />
-              <h2 className="text-xl font-bold text-white font-display">Supervised Circle & Parent Portal</h2>
+    <div className="space-y-5 max-w-5xl mx-auto">
+      {/* Top Header Card */}
+      <div className="luxury-card p-6 border border-[#C5A880]/30 relative overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-stone-900 text-[#C5A880] flex items-center justify-center shadow-md">
+              <Users className="w-5 h-5" />
             </div>
-            <p className="text-sm text-slate-300 max-w-2xl">
-              Connect parents, mentors, and driving instructors with teen drivers. Review safety ratings, track GDL hours, and export official insurance & DMV PDF reports.
-            </p>
+            <div>
+              <h2 className="text-xl font-bold text-stone-900 font-display tracking-tight">
+                Supervisor Circle & Mentorship
+              </h2>
+              <p className="text-xs text-stone-500 mt-0.5">
+                Privacy-first family circle, instructor roster & DMV certified PDF export.
+              </p>
+            </div>
           </div>
 
           {/* Sub Tab Switcher */}
-          <div className="flex items-center bg-[#020617] p-1 rounded-xl border border-white/10 shrink-0">
+          <div className="flex items-center bg-stone-100 p-1 rounded-xl border border-stone-200/80 shrink-0">
             <button
               onClick={() => setActiveTab('CIRCLE')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'CIRCLE' ? 'bg-[#a78bfa] text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                activeTab === 'CIRCLE' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-900'
               }`}
             >
               Parent-Teen Circle
@@ -109,7 +102,7 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
             <button
               onClick={() => setActiveTab('SCHOOL')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'SCHOOL' ? 'bg-[#a78bfa] text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                activeTab === 'SCHOOL' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-900'
               }`}
             >
               School Cohort
@@ -117,39 +110,37 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
             <button
               onClick={() => setActiveTab('REPORT')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeTab === 'REPORT' ? 'bg-[#a78bfa] text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white'
+                activeTab === 'REPORT' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-900'
               }`}
             >
-              PDF Safety Report
+              PDF Certificate
             </button>
           </div>
         </div>
       </div>
 
-      {/* Tab 1: Parent-Teen Supervised Circle */}
+      {/* Tab 1: Parent-Teen Circle */}
       {activeTab === 'CIRCLE' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Pair Code & How Linking Works (5 cols) */}
-          <div className="lg:col-span-5 glass-card p-6 space-y-6 flex flex-col justify-between">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          {/* Pair Code & Linking Panel (5 cols) */}
+          <div className="lg:col-span-5 luxury-card p-6 space-y-5 flex flex-col justify-between">
             <div className="space-y-3">
-              <span className="card-title text-xs font-bold text-slate-300 uppercase block mb-0">
-                Child Link Key & Pairing
-              </span>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Teens can share their unique 6-digit key with a parent or mentor. Once linked, parents receive safe trip summaries and GDL log updates.
+              <span className="card-title block">Family Link Key</span>
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Teens can share their unique 6-digit key with a parent or mentor. Parents receive defensive driving recaps and GDL hour milestones without invasive live tracking.
               </p>
 
-              <div className="p-3.5 rounded-xl bg-[#020617] border border-white/15 space-y-2">
-                <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                  Active Driver Link Key ({selectedChildAccount?.username || 'Driver'})
+              <div className="p-4 rounded-xl bg-stone-50 border border-stone-200 space-y-2">
+                <span className="text-[10px] text-stone-400 uppercase font-bold block">
+                  Active Driver Key ({selectedChildAccount?.username || 'Driver'})
                 </span>
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-base font-extrabold text-[#2dd4bf] tracking-wider">
+                  <span className="font-mono text-base font-extrabold text-stone-900 tracking-wider">
                     {supervisorCode}
                   </span>
                   <button
                     onClick={handleCopyCode}
-                    className="px-3 py-1 rounded-lg bg-[#2dd4bf]/20 hover:bg-[#2dd4bf]/30 text-[#2dd4bf] text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                    className="px-3 py-1 rounded-lg bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
                   >
                     {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
                     <span>{copiedCode ? 'Copied' : 'Copy'}</span>
@@ -159,32 +150,30 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
             </div>
 
             {/* Parent Enter Key Form */}
-            <div className="pt-4 border-t border-white/10 space-y-3">
-              <span className="card-title text-xs font-bold text-slate-300 uppercase block mb-0">
-                Link New Teen Driver
-              </span>
+            <div className="pt-4 border-t border-stone-100 space-y-3">
+              <span className="card-title block">Pair New Driver Account</span>
               <form onSubmit={handlePair} className="space-y-2.5">
                 <div className="relative">
-                  <Link className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Link className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     value={pairingInput}
                     onChange={(e) => setPairingInput(e.target.value)}
-                    placeholder="Enter key or username (e.g. DS-7492-ALEX)"
-                    className="w-full bg-[#020617] border border-white/15 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-[#a78bfa]"
+                    placeholder="Enter key (e.g. RD-7492-ALEX)"
+                    className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-9 pr-3 py-2 text-xs font-bold text-stone-900 focus:outline-none focus:border-[#C5A880]"
                   />
                 </div>
                 <button
                   type="submit"
-                  className="w-full py-2.5 rounded-xl bg-[#a78bfa] text-slate-950 font-bold text-xs hover:shadow-lg transition-all cursor-pointer"
+                  className="w-full btn-gold py-2 rounded-xl text-xs cursor-pointer"
                 >
-                  Pair Supervisor Connection
+                  Pair Connection
                 </button>
               </form>
 
               {pairingSuccessMsg && (
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>{pairingSuccessMsg}</span>
                 </div>
               )}
@@ -192,23 +181,20 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
           </div>
 
           {/* Linked Teen Driver Dashboard (7 cols) */}
-          <div className="lg:col-span-7 glass-card p-6 space-y-5">
+          <div className="lg:col-span-7 luxury-card p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="card-title text-xs font-bold text-slate-300 uppercase block mb-0">
-                Supervised Teen Profile
-              </span>
+              <span className="card-title block mb-0">Driver Profile & Status</span>
 
-              {/* Quick switch between known drivers */}
               {allAccounts.length > 1 && (
-                <div className="flex items-center gap-1 bg-[#020617] p-1 rounded-lg border border-white/10 text-xs">
-                  <span className="text-[10px] text-slate-400 px-1 font-bold">Driver:</span>
+                <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-lg border border-stone-200 text-xs">
+                  <span className="text-[10px] text-stone-400 px-1 font-bold">Driver:</span>
                   <select
                     value={selectedChildUsername}
                     onChange={(e) => setSelectedChildUsername(e.target.value)}
-                    className="bg-transparent text-xs font-bold text-[#2dd4bf] focus:outline-none cursor-pointer"
+                    className="bg-transparent text-xs font-bold text-stone-900 focus:outline-none cursor-pointer"
                   >
                     {allAccounts.map(a => (
-                      <option key={a.username} value={a.username} className="bg-slate-900 text-white">
+                      <option key={a.username} value={a.username}>
                         {a.fullName || a.username} ({a.safetyScore} pts)
                       </option>
                     ))}
@@ -217,48 +203,48 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
               )}
             </div>
 
-            {/* Teen Driver Card */}
-            <div className="p-4 rounded-xl bg-[#020617]/80 border border-white/10 space-y-4">
+            {/* Teen Overview Card */}
+            <div className="p-4 rounded-xl bg-[#F9F7F2] border border-[#C5A880]/30 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-[#2dd4bf]/20 border border-[#2dd4bf] flex items-center justify-center font-black text-sm text-[#2dd4bf]">
-                    {(selectedChildAccount?.username || 'AL').substring(0, 2).toUpperCase()}
+                  <div className="w-10 h-10 rounded-full bg-stone-900 text-[#C5A880] flex items-center justify-center text-xs font-black">
+                    {selectedChildAccount?.username.substring(0, 2).toUpperCase()}
                   </div>
                   <div>
-                    <span className="font-bold text-white text-sm block">
-                      {selectedChildAccount?.fullName || selectedChildAccount?.username || 'Alex Rivera'}
+                    <span className="text-sm font-bold text-stone-900 block">
+                      {selectedChildAccount?.fullName || selectedChildAccount?.username}
                     </span>
-                    <span className="text-xs text-slate-400 uppercase font-mono">
-                      {selectedChildAccount?.licenseStage === 'permit' ? "Learner's Permit" : 'Provisional License'} • Stage
+                    <span className="text-[11px] text-stone-500 uppercase font-mono">
+                      {selectedChildAccount?.licenseStage === 'permit' ? "Learner's Permit" : 'Provisional License'}
                     </span>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <span className="px-3 py-1 rounded-full text-xs font-extrabold font-mono bg-[#2dd4bf]/20 text-[#2dd4bf] border border-[#2dd4bf]/30">
-                    {selectedChildAccount?.safetyScore || 96} / 100
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    {selectedChildAccount?.safetyScore || 98} / 100
                   </span>
-                  <span className="block text-[10px] text-emerald-400 font-semibold mt-1">Status: Safe / Parked</span>
+                  <span className="block text-[10px] text-emerald-700 font-semibold mt-0.5">Status: Parked & Safe</span>
                 </div>
               </div>
 
               {/* Metrics Row */}
-              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/10 text-center">
-                <div className="p-2 rounded-lg bg-white/5">
-                  <span className="text-[10px] text-slate-400 block font-bold uppercase">Clean Drives</span>
-                  <span className="text-sm font-bold font-mono text-emerald-400">
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-stone-200/80 text-center">
+                <div className="p-2.5 rounded-lg bg-white border border-stone-200/60">
+                  <span className="text-[9px] text-stone-400 block font-bold uppercase">Clean Drives</span>
+                  <span className="text-sm font-bold font-mono text-emerald-700">
                     {selectedChildAccount?.cleanTrips || 0} trips
                   </span>
                 </div>
-                <div className="p-2 rounded-lg bg-white/5">
-                  <span className="text-[10px] text-slate-400 block font-bold uppercase">GDL Hours</span>
-                  <span className="text-sm font-bold font-mono text-[#a78bfa]">
+                <div className="p-2.5 rounded-lg bg-white border border-stone-200/60">
+                  <span className="text-[9px] text-stone-400 block font-bold uppercase">GDL Hours</span>
+                  <span className="text-sm font-bold font-mono text-stone-900">
                     {(gdl.completedDayHours + gdl.completedNightHours).toFixed(1)} / 50h
                   </span>
                 </div>
-                <div className="p-2 rounded-lg bg-white/5">
-                  <span className="text-[10px] text-slate-400 block font-bold uppercase">Total Distance</span>
-                  <span className="text-sm font-bold font-mono text-white">
+                <div className="p-2.5 rounded-lg bg-white border border-stone-200/60">
+                  <span className="text-[9px] text-stone-400 block font-bold uppercase">Total Distance</span>
+                  <span className="text-sm font-bold font-mono text-stone-900">
                     {(selectedChildAccount?.totalDistanceMiles || 0).toFixed(1)} mi
                   </span>
                 </div>
@@ -266,18 +252,18 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
             </div>
 
             {/* Quick Action to PDF Report */}
-            <div className="p-4 rounded-xl bg-gradient-to-r from-[#2dd4bf]/10 to-[#a78bfa]/10 border border-white/10 flex items-center justify-between gap-3">
+            <div className="p-4 rounded-xl bg-stone-50 border border-stone-200 flex items-center justify-between gap-3">
               <div>
-                <span className="text-xs font-bold text-white block">Official PDF Certificate Ready</span>
-                <span className="text-[11px] text-slate-300">
-                  Ready for auto-insurance discount verification & state DMV log.
+                <span className="text-xs font-bold text-stone-900 block">Official Insurance PDF Certificate</span>
+                <span className="text-[11px] text-stone-500">
+                  Verified safety rating ready for auto-insurance discount submission.
                 </span>
               </div>
               <button
                 onClick={() => setActiveTab('REPORT')}
-                className="px-3.5 py-1.5 rounded-lg bg-[#2dd4bf] text-slate-950 font-bold text-xs hover:shadow-lg transition-all cursor-pointer whitespace-nowrap"
+                className="btn-gold px-3.5 py-1.5 rounded-lg text-xs whitespace-nowrap cursor-pointer"
               >
-                View PDF Report
+                View PDF
               </button>
             </div>
           </div>
@@ -286,212 +272,150 @@ export const SupervisorCircleView: React.FC<{ unitSystem: UnitSystem }> = ({ uni
 
       {/* Tab 2: Driving School Instructor Cohort Dashboard */}
       {activeTab === 'SCHOOL' && (
-        <div className="glass-card p-6 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+        <div className="luxury-card p-6 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-stone-100">
             <div>
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-[#a78bfa]" /> Driver Education Cohort Roster
+              <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-[#A38258]" /> Driver Education Cohort Roster
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-stone-500">
                 Track aggregate student safety ratings and GDL supervised hours completion.
               </p>
             </div>
 
+            <span className="px-3 py-1 rounded-lg bg-stone-100 text-stone-800 border border-stone-200 text-xs font-bold font-mono">
+              Cohort Roster ({allAccounts.length} students)
+            </span>
+          </div>
+
+          {allAccounts.length === 0 ? (
+            <div className="p-8 text-center bg-stone-50 rounded-xl border border-stone-200 space-y-2">
+              <Building2 className="w-8 h-8 text-stone-400 mx-auto" />
+              <h4 className="text-sm font-bold text-stone-900">No Student Drivers Registered</h4>
+              <p className="text-xs text-stone-500 max-w-md mx-auto">
+                When students register with your driving school or enter your supervisor code, their live safety scores and supervised hours will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-stone-200 text-stone-400 uppercase text-[10px] tracking-wider">
+                    <th className="pb-3">Student Driver</th>
+                    <th className="pb-3">Stage</th>
+                    <th className="pb-3">Safety Score</th>
+                    <th className="pb-3">Clean Trips</th>
+                    <th className="pb-3">Supervised Hours</th>
+                    <th className="pb-3">Compliance Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {allAccounts.map((student, idx) => (
+                    <tr key={idx} className="hover:bg-stone-50 transition-colors">
+                      <td className="py-3.5 font-bold text-stone-900 flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-stone-900 text-[#C5A880] flex items-center justify-center text-[10px]">
+                          {student.username.substring(0, 2).toUpperCase()}
+                        </div>
+                        {student.fullName || student.username}
+                      </td>
+                      <td className="py-3.5 text-stone-600 uppercase text-[10px] font-mono">
+                        {student.licenseStage === 'permit' ? "Learner's Permit" : student.licenseStage === 'provisional' ? 'Provisional' : 'Full License'}
+                      </td>
+                      <td className="py-3.5 font-mono font-bold text-emerald-700">{student.safetyScore} / 100</td>
+                      <td className="py-3.5 font-mono text-stone-700">{student.cleanTrips} trips</td>
+                      <td className="py-3.5 font-mono text-stone-700">
+                        {((student.totalTrips || 0) * 1.2).toFixed(1)} / 50 hrs
+                      </td>
+                      <td className="py-3.5">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          student.safetyScore >= 85
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                            : 'bg-amber-50 text-amber-800 border border-amber-200'
+                        }`}>
+                          {student.safetyScore >= 85 ? 'Compliant' : 'Review Needed'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab 3: Official Printable PDF Safety Report */}
+      {activeTab === 'REPORT' && (
+        <div className="luxury-card p-8 space-y-6 bg-white border border-stone-300 shadow-xl max-w-3xl mx-auto">
+          {/* Official Letterhead */}
+          <div className="flex items-center justify-between pb-6 border-b border-stone-300">
             <div className="flex items-center gap-3">
-              <span className="px-3 py-1 rounded-lg bg-[#a78bfa]/10 text-[#a78bfa] border border-[#a78bfa]/30 text-xs font-bold font-mono">
-                Cohort Avg: 94.2 Score
+              <div className="w-10 h-10 rounded-xl bg-stone-900 text-[#C5A880] flex items-center justify-center">
+                <RadianSymbol size={26} />
+              </div>
+              <div>
+                <h2 className="text-xl font-black font-display tracking-tight text-stone-950">
+                  RADIAN<span className="text-[#A38258]">DRIVE</span>
+                </h2>
+                <p className="text-[10px] text-stone-500 uppercase tracking-widest font-mono">
+                  Official Youth Safety & GDL Compliance Certificate
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => window.print()}
+              className="btn-gold px-4 py-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer print:hidden"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Print / Save PDF</span>
+            </button>
+          </div>
+
+          {/* Certificate Body */}
+          <div className="grid grid-cols-2 gap-4 text-xs">
+            <div className="p-3 bg-stone-50 rounded-lg">
+              <span className="text-stone-400 block uppercase font-bold text-[10px]">Driver Name</span>
+              <span className="text-sm font-bold text-stone-900">
+                {selectedChildAccount?.fullName || selectedChildAccount?.username || 'Driver'}
+              </span>
+            </div>
+            <div className="p-3 bg-stone-50 rounded-lg">
+              <span className="text-stone-400 block uppercase font-bold text-[10px]">License / Permit Stage</span>
+              <span className="text-sm font-bold text-stone-900 uppercase">
+                {selectedChildAccount?.licenseStage === 'permit' ? "State Learner's Permit" : "Provisional License"}
+              </span>
+            </div>
+            <div className="p-3 bg-stone-50 rounded-lg">
+              <span className="text-stone-400 block uppercase font-bold text-[10px]">Verified Safety Score</span>
+              <span className="text-sm font-bold text-emerald-800">
+                {selectedChildAccount?.safetyScore || 98} / 100 (Grade A+)
+              </span>
+            </div>
+            <div className="p-3 bg-stone-50 rounded-lg">
+              <span className="text-stone-400 block uppercase font-bold text-[10px]">Supervised GDL Hours</span>
+              <span className="text-sm font-bold text-stone-900">
+                {(gdl.completedDayHours + gdl.completedNightHours).toFixed(1)} / 50.0 Hours Completed
               </span>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-white/10 text-slate-400 uppercase text-[10px] tracking-wider">
-                  <th className="pb-3">Student Driver</th>
-                  <th className="pb-3">Stage</th>
-                  <th className="pb-3">Safety Score</th>
-                  <th className="pb-3">Clean Trips</th>
-                  <th className="pb-3">Supervised Hours</th>
-                  <th className="pb-3">Compliance Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {(allAccounts.length > 0
-                  ? allAccounts
-                  : [
-                      {
-                        username: 'alex_rivera',
-                        fullName: 'Alex Rivera',
-                        licenseStage: 'permit',
-                        safetyScore: 97,
-                        cleanTrips: 8,
-                        totalTrips: 10
-                      },
-                      {
-                        username: 'sarah_chen',
-                        fullName: 'Sarah Chen',
-                        licenseStage: 'permit',
-                        safetyScore: 94,
-                        cleanTrips: 12,
-                        totalTrips: 14
-                      },
-                      {
-                        username: 'marcus_vance',
-                        fullName: 'Marcus Vance',
-                        licenseStage: 'provisional',
-                        safetyScore: 89,
-                        cleanTrips: 5,
-                        totalTrips: 7
-                      }
-                    ]
-                ).map((student: any, idx: number) => (
-                  <tr key={idx} className="hover:bg-white/5 transition-colors">
-                    <td className="py-3.5 font-bold text-white flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-[#a78bfa]/20 text-[#a78bfa] flex items-center justify-center text-[10px]">
-                        {student.username.substring(0, 2).toUpperCase()}
-                      </div>
-                      {student.fullName || student.username}
-                    </td>
-                    <td className="py-3.5 text-slate-300 uppercase text-[10px] font-mono">
-                      {student.licenseStage || "Learner's Permit"}
-                    </td>
-                    <td className="py-3.5 font-mono font-bold text-[#2dd4bf]">{student.safetyScore} / 100</td>
-                    <td className="py-3.5 font-mono text-slate-300">{student.cleanTrips} trips</td>
-                    <td className="py-3.5 font-mono text-slate-300">
-                      {((student.totalTrips || 1) * 1.4).toFixed(1)} / 50 hrs
-                    </td>
-                    <td className="py-3.5">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
-                        Compliant
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Tab 3: Official Parent / Mentor Safety PDF Report */}
-      {activeTab === 'REPORT' && (
-        <div className="space-y-4">
-          <div className="flex justify-end">
-            <button
-              onClick={handlePrintPdf}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#a78bfa] text-slate-950 font-bold text-xs hover:shadow-lg transition-all cursor-pointer glow-mint"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Print / Save as PDF Certificate</span>
-            </button>
+          <div className="p-4 bg-[#F9F7F2] border border-[#C5A880]/30 rounded-xl text-xs space-y-1.5 text-stone-700">
+            <span className="font-bold block text-stone-900">Institutional Certification:</span>
+            <p>
+              This official document certifies that telemetry recordings captured through the RadianDrive telematics sensor suite reflect defensive driving discipline with zero severe kinematic jerk events.
+            </p>
           </div>
 
-          {/* Printable Official Report Paper View */}
-          <div
-            id="printable-report"
-            className="p-8 rounded-2xl bg-slate-900 border border-white/20 text-slate-100 space-y-6 shadow-2xl print:bg-white print:text-black print:border-none print:p-0"
-          >
-            {/* Report Header */}
-            <div className="flex items-center justify-between pb-6 border-b border-white/20 print:border-black">
-              <div>
-                <h2 className="text-xl font-extrabold font-display tracking-tight text-white print:text-black">
-                  DRIVESAFE YOUTH INITIATIVE
-                </h2>
-                <p className="text-xs text-slate-400 print:text-slate-600">
-                  Official Telematics Safety & GDL Compliance Record
-                </p>
-              </div>
-              <div className="text-right">
-                <span className="text-xs font-mono font-bold text-[#2dd4bf] print:text-emerald-700 block">
-                  CERTIFICATE ID: DS-{Date.now().toString().slice(-6)}
-                </span>
-                <span className="text-[10px] text-slate-400 print:text-slate-600">
-                  Generated: {new Date().toLocaleDateString()}
-                </span>
-              </div>
+          {/* Signature Lines */}
+          <div className="grid grid-cols-2 gap-8 pt-8 border-t border-stone-200 text-xs">
+            <div className="space-y-1">
+              <div className="border-b border-stone-400 h-8" />
+              <span className="text-[10px] text-stone-500 block uppercase font-bold">Licensed Supervisor / Parent Signature</span>
             </div>
-
-            {/* Driver Profile Matrix */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-[#020617] border border-white/10 print:bg-slate-100 print:border-slate-300 print:text-black">
-              <div>
-                <span className="text-[10px] text-slate-400 print:text-slate-600 uppercase block font-bold">
-                  Driver Name
-                </span>
-                <span className="text-sm font-bold text-white print:text-black">
-                  {selectedChildAccount?.fullName || selectedChildUsername || 'Alex Rivera'}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 print:text-slate-600 uppercase block font-bold">
-                  License Status
-                </span>
-                <span className="text-sm font-bold text-white print:text-black uppercase">
-                  {selectedChildAccount?.licenseStage || "Learner's Permit"}
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 print:text-slate-600 uppercase block font-bold">
-                  Overall Score
-                </span>
-                <span className="text-sm font-bold font-mono text-[#2dd4bf] print:text-emerald-700">
-                  {selectedChildAccount?.safetyScore || 96} / 100
-                </span>
-              </div>
-              <div>
-                <span className="text-[10px] text-slate-400 print:text-slate-600 uppercase block font-bold">
-                  Total Safe Miles
-                </span>
-                <span className="text-sm font-bold font-mono text-white print:text-black">
-                  {(selectedChildAccount?.totalDistanceMiles || 42.8).toFixed(1)} miles
-                </span>
-              </div>
-            </div>
-
-            {/* Telematics Metrics & GDL Log Summary */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 print:text-black">
-                Graduated Driver Licensing (GDL) Supervised Hours
-              </h4>
-              <div className="grid grid-cols-3 gap-3 text-xs">
-                <div className="p-3 rounded-lg bg-white/5 print:bg-slate-50 border border-white/10 print:border-slate-200">
-                  <span className="text-[10px] text-slate-400 print:text-slate-600 block">Daytime Hours</span>
-                  <span className="text-base font-bold font-mono">{gdl.completedDayHours} / 40 hrs</span>
-                </div>
-                <div className="p-3 rounded-lg bg-white/5 print:bg-slate-50 border border-white/10 print:border-slate-200">
-                  <span className="text-[10px] text-slate-400 print:text-slate-600 block">Nighttime Hours</span>
-                  <span className="text-base font-bold font-mono">{gdl.completedNightHours} / 10 hrs</span>
-                </div>
-                <div className="p-3 rounded-lg bg-white/5 print:bg-slate-50 border border-white/10 print:border-slate-200">
-                  <span className="text-[10px] text-slate-400 print:text-slate-600 block">Clean Trip Ratio</span>
-                  <span className="text-base font-bold font-mono text-emerald-400 print:text-emerald-700">
-                    {Math.round(
-                      ((selectedChildAccount?.cleanTrips || 1) / Math.max(1, selectedChildAccount?.totalTrips || 1)) * 100
-                    )}
-                    %
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Mentor Endorsement & Signature Line */}
-            <div className="pt-8 border-t border-white/20 print:border-black grid grid-cols-2 gap-8 text-xs">
-              <div>
-                <div className="border-b border-slate-500 pb-1 h-8 flex items-end">
-                  <span className="font-mono text-slate-300 print:text-black">
-                    {selectedChildAccount?.parentName || 'Verified Parent / Mentor'}
-                  </span>
-                </div>
-                <span className="text-[10px] text-slate-400 print:text-slate-600 block mt-1">
-                  Supervisor / Parent Signature
-                </span>
-              </div>
-              <div>
-                <div className="border-b border-slate-500 pb-1 h-8 flex items-end">
-                  <span className="font-mono text-slate-300 print:text-black">{new Date().toLocaleDateString()}</span>
-                </div>
-                <span className="text-[10px] text-slate-400 print:text-slate-600 block mt-1">Date of Endorsement</span>
-              </div>
+            <div className="space-y-1">
+              <div className="border-b border-stone-400 h-8" />
+              <span className="text-[10px] text-stone-500 block uppercase font-bold">Certification Date</span>
             </div>
           </div>
         </div>

@@ -5,16 +5,19 @@ import { RiskAnalysisView } from './components/RiskAnalysisView';
 import { LeaderboardView } from './components/LeaderboardView';
 import { GamificationView } from './components/GamificationView';
 import { HazardMapView } from './components/HazardMapView';
+import { CommunityGroupsView } from './components/CommunityGroupsView';
 import { GdlTrackerView } from './components/GdlTrackerView';
 import { SupervisorCircleView } from './components/SupervisorCircleView';
 import { TripHistoryReplayModal } from './components/TripHistoryReplayModal';
 import { UserLoginModal } from './components/UserLoginModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { DatabaseStatusModal } from './components/DatabaseStatusModal';
+import { LuxurySplashScreen } from './components/LuxurySplashScreen';
 import { LanguageCode, NavTab, UnitSystem } from './types';
 import { fetchAccountFromSupabase, getAccount, getActiveUsername, UserAccount } from './lib/accountManager';
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState<NavTab>('hud');
   const [currentLanguage, setCurrentLanguage] = useState<LanguageCode>('en');
   const [unitSystem, setUnitSystem] = useState<UnitSystem>('imperial');
@@ -84,16 +87,17 @@ export default function App() {
 
   const handleTripCompleted = (summary: any) => {
     setLastTripSummary(summary);
-    // Refresh active account state
     if (activeUsername) {
       setActiveAccount(getAccount(activeUsername));
     }
-    // Switch to Risk Analysis view automatically on trip completion
     setActiveTab('analysis');
   };
 
   return (
-    <div className="min-h-screen bg-transparent text-slate-100 flex flex-col font-sans selection:bg-[#2dd4bf] selection:text-slate-950">
+    <div className="min-h-screen bg-[#FBF9F5] text-stone-900 flex flex-col font-sans selection:bg-[#C5A880] selection:text-stone-950">
+      {/* Luxury Loading Splash Screen */}
+      {showSplash && <LuxurySplashScreen onComplete={() => setShowSplash(false)} />}
+
       {/* User Login & Questionnaire Modal */}
       <UserLoginModal
         isOpen={isLoginModalOpen}
@@ -120,7 +124,7 @@ export default function App() {
         onClose={() => setIsDbModalOpen(false)}
       />
 
-      {/* Sticky Top Header */}
+      {/* Sticky Top Luxury Header */}
       <NavigationHeader
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -141,7 +145,7 @@ export default function App() {
       />
 
       {/* Main Content Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-4 pb-24 lg:pb-8">
         {activeTab === 'hud' && (
           <TelematicsHudView
             currentLanguage={currentLanguage}
@@ -180,21 +184,30 @@ export default function App() {
         )}
 
         {activeTab === 'hazards' && <HazardMapView unitSystem={unitSystem} />}
+
+        {activeTab === 'community' && <CommunityGroupsView onOpenLoginModal={() => setIsLoginModalOpen(true)} />}
       </main>
 
-      {/* Public App Footer */}
-      <footer className="glass border-t border-white/10 my-4 mx-4 lg:mx-8 py-4 px-6 text-xs text-slate-400">
+      {/* Luxury Minimalist App Footer */}
+      <footer className="bg-white/80 backdrop-blur-md border-t border-stone-200/60 my-2 mx-4 lg:mx-8 py-3.5 px-6 rounded-2xl text-xs text-stone-500 shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-slate-300 text-[11px]">
-            <span className="w-2 h-2 rounded-full bg-[#2dd4bf] animate-pulse" />
+          <div className="flex items-center gap-2 text-stone-700 text-[11px]">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
             <span>
-              DriveSafe Telematics • Active User:{' '}
-              <strong className="text-white">{activeUsername || 'Guest'}</strong> (
-              {activeAccount?.role || 'Young Driver'})
+              RadianDrive Telematics • Active Driver:{' '}
+              <strong className="text-stone-900 font-bold">{activeUsername || 'Guest'}</strong> (
+              {activeAccount?.role === 'gdl_student'
+                ? "Permit Student"
+                : activeAccount?.role === 'parent_mentor'
+                ? "Parent / Mentor"
+                : activeAccount?.role === 'driving_instructor'
+                ? "Driving Instructor"
+                : "Young Driver"}
+              )
             </span>
           </div>
-          <p className="font-medium text-[11px] text-slate-400">
-            © {new Date().getFullYear()} DriveSafe Youth Initiative • Real Telematics & Safety Tracking.
+          <p className="font-medium text-[11px] text-stone-400">
+            © {new Date().getFullYear()} RadianDrive • Precision Telematics & Youth Mentorship
           </p>
         </div>
       </footer>

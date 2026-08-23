@@ -4,7 +4,7 @@ export type UnitSystem = 'imperial' | 'metric';
 
 export type UserRole = 'young_driver' | 'gdl_student' | 'parent_mentor' | 'driving_instructor';
 
-export type NavTab = 'hud' | 'analysis' | 'trips' | 'gdl' | 'supervisor' | 'leaderboard' | 'gamification' | 'hazards';
+export type NavTab = 'hud' | 'analysis' | 'trips' | 'gdl' | 'supervisor' | 'leaderboard' | 'gamification' | 'hazards' | 'community';
 
 export interface TelemetryPoint {
   timestamp: number;

@@ -5,28 +5,25 @@ import {
   Gauge,
   Zap,
   Compass,
-  AlertOctagon,
-  ShieldCheck,
-  Activity,
-  CheckCircle2,
-  Car,
-  Clock,
   Volume2,
   VolumeX,
   History,
   Sun,
   Moon,
   CloudSun,
-  CloudRain,
-  CloudFog,
   Radio,
-  Sliders
+  Sliders,
+  ChevronDown,
+  ChevronUp,
+  ShieldCheck,
+  Award
 } from 'lucide-react';
 import { TelematicsState, LanguageCode, UnitSystem } from '../types';
 import { t } from '../translations';
 import { recordTripForActiveUser, getActiveUsername, getAccount } from '../lib/accountManager';
 import { soundManager } from '../lib/soundAlerts';
 import { TripHistoryReplayModal } from './TripHistoryReplayModal';
+import { RadianSymbol } from './RadianSymbol';
 
 interface TelematicsHudViewProps {
   currentLanguage: LanguageCode;
@@ -39,7 +36,6 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
   currentLanguage,
   unitSystem,
   onTripCompleted,
-  hasNativeBridge
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const telematicsEngineRef = useRef<any>(null);
@@ -55,6 +51,7 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
     currentAccount?.preferences?.autoTripDetection ?? true
   );
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showPreferences, setShowPreferences] = useState(false);
 
   // Speed Limit State
   const [postedSpeedLimitMph, setPostedSpeedLimitMph] = useState<number>(35);
@@ -103,7 +100,7 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
           soundManager.speak('Sudden braking detected. Maintain a smooth follow distance.');
         } else if (state.gForceMag > 0.65) {
           soundManager.playChime('WARNING');
-          soundManager.speak('Moderate your turning speed to maintain vehicle stability.');
+          soundManager.speak('Moderate turning speed for optimal stability.');
         }
 
         // Auto-Start & Auto-Stop Motion Evaluation
@@ -124,7 +121,6 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
 
           if (engine.isTracking && currentSpeedMph < 0.8) {
             stoppedStreakRef.current += 1;
-            // 25 updates stationary = ~25s auto-stop
             if (stoppedStreakRef.current >= 25) {
               stoppedStreakRef.current = 0;
               handleStopTracking();
@@ -169,28 +165,12 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
     }
   };
 
-  const handleHapticTest = () => {
-    soundManager.playChime('WARNING');
-    soundManager.speak('Test safety alert activated.');
-    if (window.AndroidBridge && window.AndroidBridge.triggerHapticWarning) {
-      window.AndroidBridge.triggerHapticWarning('HARSH_BRAKING');
-    } else {
-      if (navigator.vibrate) {
-        navigator.vibrate([150, 80, 150]);
-      }
-    }
-  };
-
   const isImperial = unitSystem === 'imperial';
   const currentSpeedMph = hudData.speedKmh * 0.621371;
-  const displaySpeed = (hudData.speedKmh * (isImperial ? 0.621371 : 1)).toFixed(1);
-  const speedUnit = isImperial ? 'mph' : 'km/h';
-  const displayDistance = (hudData.distanceKm * (isImperial ? 0.621371 : 1)).toFixed(2);
+  const displaySpeed = (hudData.speedKmh * (isImperial ? 0.621371 : 1)).toFixed(0);
+  const speedUnit = isImperial ? 'MPH' : 'KM/H';
+  const displayDistance = (hudData.distanceKm * (isImperial ? 0.621371 : 1)).toFixed(1);
   const distanceUnit = isImperial ? 'mi' : 'km';
-  const speedBarPercent = Math.min(
-    100,
-    ((hudData.speedKmh * (isImperial ? 0.621371 : 1)) / (isImperial ? 75 : 120)) * 100
-  );
 
   // Speed Limit Comparison Logic
   const displayPostedLimit = isImperial ? postedSpeedLimitMph : Math.round(postedSpeedLimitMph * 1.60934);
@@ -201,338 +181,280 @@ export const TelematicsHudView: React.FC<TelematicsHudViewProps> = ({
   // Stability Status
   const getStabilityStatus = () => {
     if (hudData.gForceMag > 0.6) {
-      return { text: 'Sudden Movement', color: 'text-rose-400', badgeBg: 'bg-rose-500/10 border-rose-500/30' };
+      return { text: 'Sudden Motion', color: 'text-rose-600', badgeBg: 'bg-rose-50 border-rose-200' };
     }
     if (hudData.gForceMag > 0.35) {
-      return { text: 'Moderate Lateral Force', color: 'text-[#a78bfa]', badgeBg: 'bg-[#a78bfa]/10 border-[#a78bfa]/30' };
+      return { text: 'Moderate Lateral Force', color: 'text-amber-600', badgeBg: 'bg-amber-50 border-amber-200' };
     }
-    return { text: 'Optimal Stability', color: 'text-[#2dd4bf]', badgeBg: 'bg-[#2dd4bf]/10 border-[#2dd4bf]/30' };
+    return { text: 'Optimal Stability', color: 'text-emerald-700', badgeBg: 'bg-emerald-50 border-emerald-200' };
   };
 
   const stability = getStabilityStatus();
 
   return (
-    <div className="space-y-6">
-      {/* Top Banner & Quick Controls */}
-      <div className="glass-card p-6 border border-[#2dd4bf]/20 relative overflow-hidden">
-        <div className="absolute -right-16 -bottom-16 w-64 h-64 bg-[#2dd4bf]/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Activity className="w-5 h-5 text-[#2dd4bf]" />
-              <h2 className="text-xl font-bold text-white font-display">{t('hud_title', currentLanguage)}</h2>
+    <div className="space-y-5 max-w-5xl mx-auto">
+      {/* Executive Cockpit Header Card */}
+      <div className="luxury-card p-5 sm:p-6 relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-stone-900 text-[#C5A880] flex items-center justify-center shadow-md">
+              <RadianSymbol size={26} />
             </div>
-            <p className="text-sm text-slate-300 max-w-2xl">{t('hud_desc', currentLanguage)}</p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg sm:text-xl font-bold text-stone-900 font-display tracking-tight">
+                  Cockpit Telematics
+                </h2>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border font-mono ${
+                    isTracking
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 animate-pulse'
+                      : 'bg-stone-100 text-stone-600 border-stone-200'
+                  }`}
+                >
+                  {isTracking ? 'Live Session' : 'Ready'}
+                </span>
+              </div>
+              <p className="text-xs text-stone-500 mt-0.5">
+                Real-time kinematic vector coaching & smooth trajectory scoring.
+              </p>
+            </div>
           </div>
 
-          {/* Action Toolbar */}
-          <div className="flex items-center flex-wrap gap-2.5">
-            {/* Audio Voice Alert Toggle */}
+          {/* Quick Action Controls */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Audio Voice Coach Toggle */}
             <button
               onClick={() => setVoiceAlertsActive(!voiceAlertsActive)}
               className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold ${
                 voiceAlertsActive
-                  ? 'bg-[#2dd4bf]/15 border-[#2dd4bf] text-[#2dd4bf]'
-                  : 'bg-[#020617] border-white/10 text-slate-400'
+                  ? 'bg-[#C5A880]/15 border-[#C5A880] text-[#A38258]'
+                  : 'bg-stone-50 border-stone-200 text-stone-400'
               }`}
-              title={voiceAlertsActive ? 'Spoken Voice Safety Alerts Enabled' : 'Voice Alerts Muted'}
+              title={voiceAlertsActive ? 'Spoken Voice Safety Alerts Active' : 'Voice Alerts Muted'}
             >
               {voiceAlertsActive ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              <span className="hidden sm:inline">{voiceAlertsActive ? 'Voice On' : 'Muted'}</span>
+              <span className="hidden md:inline">{voiceAlertsActive ? 'Voice Coach' : 'Muted'}</span>
             </button>
 
-            {/* Trip History Button */}
+            {/* Trip Log Modal Trigger */}
             <button
               onClick={() => setShowHistoryModal(true)}
-              className="p-2.5 rounded-xl bg-[#020617] border border-white/10 hover:border-white/20 text-slate-300 hover:text-white transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold"
-              title="Inspect Trip History and Route Replay"
+              className="p-2.5 rounded-xl bg-stone-50 border border-stone-200 hover:bg-stone-100 text-stone-700 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+              title="View Trip Logbook & Route Replay"
             >
-              <History className="w-4 h-4 text-[#a78bfa]" />
-              <span className="hidden sm:inline">Trips Log</span>
+              <History className="w-4 h-4 text-stone-600" />
+              <span className="hidden md:inline">Logbook</span>
             </button>
 
-            {/* Start / Stop Driving Session Button */}
+            {/* Start / End Driving Session */}
             {!isTracking ? (
               <button
                 onClick={() => handleStartTracking(false)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#a78bfa] text-slate-950 font-bold hover:shadow-lg hover:shadow-[#2dd4bf]/25 transition-all cursor-pointer glow-mint text-xs uppercase tracking-wider"
+                className="btn-gold px-5 py-2.5 rounded-xl text-xs flex items-center gap-2 cursor-pointer uppercase tracking-wider"
               >
-                <Play className="w-4 h-4 fill-slate-950" />
-                <span>{t('start_drive', currentLanguage)}</span>
+                <Play className="w-4 h-4 fill-stone-950" />
+                <span>Start Session</span>
               </button>
             ) : (
               <button
                 onClick={handleStopTracking}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 text-white font-bold hover:shadow-lg hover:shadow-rose-500/25 transition-all cursor-pointer text-xs uppercase tracking-wider"
+                className="px-5 py-2.5 rounded-xl bg-stone-900 text-white font-bold text-xs hover:bg-stone-800 transition-all cursor-pointer flex items-center gap-2 uppercase tracking-wider shadow-md"
               >
                 <Square className="w-4 h-4 fill-white" />
-                <span>{t('stop_drive', currentLanguage)}</span>
+                <span>End Session</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Environmental & Speed Limit Context Bar */}
-        <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs">
-          {/* Day / Night / Weather Context */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#020617] border border-white/10 text-slate-300 font-medium">
-              {isNight ? (
-                <Moon className="w-3.5 h-3.5 text-[#a78bfa]" />
-              ) : isDusk ? (
-                <CloudSun className="w-3.5 h-3.5 text-amber-400" />
-              ) : (
-                <Sun className="w-3.5 h-3.5 text-amber-300" />
-              )}
-              <span>{isNight ? 'Night Driving' : isDusk ? 'Dusk / Low Light' : 'Daylight Driving'}</span>
+        {/* Collapsible Quick Settings Drawer */}
+        <div className="mt-4 pt-3 border-t border-stone-200/60">
+          <button
+            onClick={() => setShowPreferences(!showPreferences)}
+            className="w-full flex items-center justify-between text-xs font-semibold text-stone-600 hover:text-stone-900 cursor-pointer py-1"
+          >
+            <div className="flex items-center gap-2">
+              <Sliders className="w-3.5 h-3.5 text-[#A38258]" />
+              <span>Drive Context: {weatherCondition} • {isNight ? 'Night' : 'Daylight'} • Road Limit: {displayPostedLimit} {speedUnit}</span>
             </div>
+            <div className="flex items-center gap-1 text-[11px] text-stone-400">
+              <span>{showPreferences ? 'Hide Options' : 'Adjust'}</span>
+              {showPreferences ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </div>
+          </button>
 
-            {/* Weather Selector */}
-            <div className="flex items-center gap-1 bg-[#020617] p-0.5 rounded-lg border border-white/10">
-              {(['Clear', 'Rain', 'Fog'] as const).map((cond) => (
+          {showPreferences && (
+            <div className="mt-3 pt-3 border-t border-stone-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs animate-in fade-in">
+              {/* Road Speed Limit */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-stone-500 uppercase">Road Speed Limit</label>
+                <select
+                  value={postedSpeedLimitMph}
+                  onChange={(e) => setPostedSpeedLimitMph(Number(e.target.value))}
+                  className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-1.5 text-xs font-bold text-stone-900 focus:outline-none focus:border-[#C5A880]"
+                >
+                  <option value={25}>25 MPH (City / Residential)</option>
+                  <option value={35}>35 MPH (Arterial / Suburb)</option>
+                  <option value={45}>45 MPH (Avenue / Express)</option>
+                  <option value={65}>65 MPH (Highway / Interstate)</option>
+                </select>
+              </div>
+
+              {/* Weather Condition */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-stone-500 uppercase">Road Condition</label>
+                <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-xl border border-stone-200">
+                  {(['Clear', 'Rain', 'Fog'] as const).map((cond) => (
+                    <button
+                      key={cond}
+                      onClick={() => setWeatherCondition(cond)}
+                      className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                        weatherCondition === cond
+                          ? 'bg-white text-stone-900 shadow-xs'
+                          : 'text-stone-500 hover:text-stone-800'
+                      }`}
+                    >
+                      {cond}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Auto-Detection Toggle */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-stone-500 uppercase">Trip Auto-Start</label>
                 <button
-                  key={cond}
-                  onClick={() => setWeatherCondition(cond)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                    weatherCondition === cond
-                      ? 'bg-[#2dd4bf] text-slate-950'
-                      : 'text-slate-400 hover:text-slate-200'
+                  onClick={() => setAutoDetectEnabled(!autoDetectEnabled)}
+                  className={`w-full py-1.5 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                    autoDetectEnabled
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                      : 'bg-stone-50 border-stone-200 text-stone-500'
                   }`}
                 >
-                  {cond}
+                  <span className="flex items-center gap-1.5">
+                    <Radio className="w-3.5 h-3.5" />
+                    <span>Auto-Detect Movement</span>
+                  </span>
+                  <span className="font-mono text-[10px]">{autoDetectEnabled ? 'ON' : 'OFF'}</span>
                 </button>
-              ))}
+              </div>
             </div>
-          </div>
-
-          {/* Auto-Start Badge & Posted Speed Selector */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setAutoDetectEnabled(!autoDetectEnabled)}
-              className={`text-[11px] font-mono flex items-center gap-1 px-2 py-1 rounded-lg border transition-all cursor-pointer ${
-                autoDetectEnabled
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                  : 'bg-slate-900 border-white/10 text-slate-500'
-              }`}
-              title="Motion sensor auto-detection for starting/stopping driving sessions"
-            >
-              <Radio className="w-3 h-3" />
-              <span>Auto-Detect: {autoDetectEnabled ? 'Active' : 'Manual'}</span>
-            </button>
-
-            {/* Posted Road Speed Selector */}
-            <div className="flex items-center gap-1.5 bg-[#020617] px-2 py-1 rounded-lg border border-white/10">
-              <span className="text-[10px] text-slate-400 font-bold uppercase">Road Limit:</span>
-              <select
-                value={postedSpeedLimitMph}
-                onChange={(e) => setPostedSpeedLimitMph(Number(e.target.value))}
-                className="bg-transparent text-xs font-bold font-mono text-[#2dd4bf] focus:outline-none cursor-pointer"
-              >
-                <option value={25} className="bg-slate-900 text-white">25 mph (City)</option>
-                <option value={35} className="bg-slate-900 text-white">35 mph (Arterial)</option>
-                <option value={45} className="bg-slate-900 text-white">45 mph (Avenue)</option>
-                <option value={65} className="bg-slate-900 text-white">65 mph (Highway)</option>
-              </select>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Main Telematics Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Col: Smooth Drive Radar (6 cols) */}
-        <div className="lg:col-span-6 glass-card p-6 flex flex-col items-center justify-center relative">
-          <div className="w-full flex items-center justify-between mb-4">
-            <span className="card-title flex items-center gap-2 mb-0 text-xs font-bold text-white uppercase tracking-wider">
-              <Compass className="w-4 h-4 text-[#2dd4bf]" /> {t('g_force_vector', currentLanguage)}
+      {/* Main Clean Luxury Cockpit Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Left / Center: Minimalist Radial Radar & Digital Speed Cluster (7 cols) */}
+        <div className="lg:col-span-7 luxury-card p-6 flex flex-col items-center justify-between min-h-[380px]">
+          <div className="w-full flex items-center justify-between mb-2">
+            <span className="card-title mb-0 flex items-center gap-1.5">
+              <Compass className="w-3.5 h-3.5 text-[#A38258]" /> Kinematic Stability Vector
             </span>
-            <div className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${stability.badgeBg} ${stability.color}`}>
+            <div className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${stability.badgeBg} ${stability.color}`}>
               <span>{stability.text}</span>
             </div>
           </div>
 
-          <div className="relative my-2 hud-circle">
-            <canvas ref={canvasRef} width={260} height={260} className="rounded-full shadow-2xl" />
+          {/* Luxury Instrument Cluster (Speedometer & Vector Canvas) */}
+          <div className="relative my-4 flex items-center justify-center">
+            {/* Outer Radial Gauge */}
+            <div className="hud-luxury-circle relative">
+              <canvas ref={canvasRef} width={260} height={260} className="rounded-full absolute inset-0 z-10" />
+
+              {/* Central Clean Numerical Readout */}
+              <div className="relative z-20 text-center pointer-events-none mt-2">
+                <div className="text-5xl sm:text-6xl font-black tracking-tighter text-stone-900 font-display">
+                  {displaySpeed}
+                </div>
+                <div className="text-xs uppercase font-extrabold tracking-widest text-[#A38258] mt-[-4px]">
+                  {speedUnit}
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Clean Radar Legend */}
-          <div className="flex items-center justify-center gap-6 mt-4 text-xs font-medium text-slate-300">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#2dd4bf]" />
-              <span>Optimal Zone</span>
+          {/* Minimalist Speed Limit Indicator */}
+          <div className="w-full pt-3 border-t border-stone-100 flex items-center justify-between text-xs text-stone-600">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] uppercase tracking-wider text-stone-400 font-bold">Speed Advisory:</span>
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border font-mono ${
+                  isSpeedExceeded
+                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                    : isNearLimit
+                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                }`}
+              >
+                {isSpeedExceeded
+                  ? 'Exceeding Posted Limit'
+                  : isNearLimit
+                  ? 'At Road Limit'
+                  : 'Safe Driving Pace'}
+              </span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#a78bfa]" />
-              <span>Standard Turn</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-              <span>Sudden Force</span>
+
+            <div className="text-right font-mono font-bold text-stone-900">
+              Limit: {displayPostedLimit} {speedUnit}
             </div>
           </div>
         </div>
 
-        {/* Right Col: Clean Telematics Metrics & Speed Limit Comparison (6 cols) */}
-        <div className="lg:col-span-6 space-y-4">
-          {/* Speed & Posted Limit Card */}
-          <div className="glass-card p-5 relative overflow-hidden">
+        {/* Right: Clean Live Metrics & Safety Stats (5 cols) */}
+        <div className="lg:col-span-5 space-y-4 flex flex-col justify-between">
+          {/* Live Safety Index Card */}
+          <div className="luxury-card p-5 relative overflow-hidden flex-1 flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Gauge className="w-4 h-4 text-[#2dd4bf]" />
-                <span className="card-title mb-0 text-xs text-slate-300 font-bold uppercase">
-                  {t('current_speed', currentLanguage)}
-                </span>
-              </div>
-
-              {/* Dynamic Speed Limit Comparison Badge */}
-              <span
-                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border font-mono ${
-                  isSpeedExceeded
-                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                    : isNearLimit
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                }`}
-              >
-                {isSpeedExceeded
-                  ? 'Exceeding Limit'
-                  : isNearLimit
-                  ? 'At Road Limit'
-                  : 'Within Posted Limit'}
+              <span className="card-title mb-0 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Driver Safety Score
+              </span>
+              <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                Live Rating
               </span>
             </div>
 
-            <div className="flex items-baseline justify-between mt-2">
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-white font-mono">{displaySpeed}</span>
-                <span className="text-xs text-[#2dd4bf] font-bold uppercase">{speedUnit}</span>
+            <div className="my-3 flex items-baseline justify-between">
+              <div className="text-4xl font-black text-stone-900 font-display tracking-tight">
+                {currentAccount?.safetyScore || 98}
+                <span className="text-base font-normal text-stone-400"> / 100</span>
               </div>
               <div className="text-right">
-                <span className="text-[10px] text-slate-400 uppercase font-bold block">Posted Limit</span>
-                <span className="text-sm font-bold font-mono text-[#2dd4bf]">
-                  {displayPostedLimit} {speedUnit}
-                </span>
+                <span className="text-xs font-bold text-emerald-700 block">Clean Record</span>
+                <span className="text-[10px] text-stone-400">Zero sudden incidents</span>
               </div>
             </div>
 
-            <div className="w-full bg-slate-900/90 h-1.5 rounded-full mt-3 overflow-hidden border border-white/10">
+            {/* Smooth Progress Bar */}
+            <div className="h-2 w-full bg-stone-100 rounded-full overflow-hidden">
               <div
-                className={`h-full transition-all duration-300 ${
-                  isSpeedExceeded ? 'bg-rose-500' : 'bg-[#2dd4bf]'
-                }`}
-                style={{ width: `${speedBarPercent}%` }}
+                className="h-full bg-gradient-to-r from-[#C5A880] to-emerald-500 rounded-full"
+                style={{ width: `${currentAccount?.safetyScore || 98}%` }}
               />
             </div>
           </div>
 
-          {/* Distance & Duration Row */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="glass-card p-4">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="card-title mb-0 text-[11px] text-slate-400 font-bold uppercase">
-                  {t('trip_distance', currentLanguage)}
-                </span>
-                <Zap className="w-3.5 h-3.5 text-[#a78bfa]" />
+          {/* Quick Metrics Split Matrix */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Trip Distance */}
+            <div className="luxury-panel p-4">
+              <span className="card-title block">Session Distance</span>
+              <div className="text-2xl font-black text-stone-900 font-display">
+                {displayDistance} <span className="text-xs font-semibold text-stone-400">{distanceUnit}</span>
               </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-[#a78bfa] font-mono">{displayDistance}</span>
-                <span className="text-[10px] text-slate-400 font-bold uppercase">{distanceUnit}</span>
-              </div>
+              <span className="text-[10px] text-stone-400 block mt-1">Logged to GDL</span>
             </div>
 
-            <div className="glass-card p-4">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="card-title mb-0 text-[11px] text-slate-400 font-bold uppercase">
-                  {t('harsh_braking', currentLanguage)}
-                </span>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            {/* Harsh Events */}
+            <div className="luxury-panel p-4">
+              <span className="card-title block">Sudden Events</span>
+              <div className="text-2xl font-black text-stone-900 font-display">
+                {hudData.harshBrakingCount + hudData.harshCorneringCount}
               </div>
-              <div className="flex items-baseline gap-1.5">
-                <span
-                  className={`text-2xl font-black font-mono ${
-                    hudData.harshBrakingCount > 0 ? 'text-amber-400' : 'text-emerald-400'
-                  }`}
-                >
-                  {hudData.harshBrakingCount}
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium">abrupt stops</span>
-              </div>
+              <span className="text-[10px] text-emerald-600 font-medium block mt-1">Defensive Pace</span>
             </div>
           </div>
-
-          {/* Desktop Simulation Controls */}
-          <div className="glass-card p-4 space-y-2.5">
-            <div className="flex items-center justify-between text-xs text-slate-300">
-              <span className="font-semibold flex items-center gap-1.5">
-                <Car className="w-3.5 h-3.5 text-[#2dd4bf]" /> Desktop Sensor Simulator
-              </span>
-              <button
-                onClick={() => {
-                  if (telematicsEngineRef.current) {
-                    if (!isTracking) handleStartTracking(true);
-                    telematicsEngineRef.current.setDemoSpeed(isImperial ? 48.28 : 45);
-                  }
-                }}
-                className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[#2dd4bf] text-xs font-semibold border border-white/10 cursor-pointer transition-colors"
-              >
-                {isImperial ? 'Simulate 30 mph Motion' : t('sim_speed', currentLanguage)}
-              </button>
-            </div>
-
-            <button
-              onClick={handleHapticTest}
-              className="w-full py-2 px-3 rounded-lg bg-[#020617]/70 border border-white/10 hover:border-[#a78bfa]/40 text-xs font-semibold text-slate-300 flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <AlertOctagon className="w-3.5 h-3.5 text-[#a78bfa]" />
-              <span>Test Audio & Haptic Alert</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Live Telemetry Activity Feed */}
-      <div className="glass-card p-5 text-xs">
-        <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
-          <span className="text-slate-200 font-bold flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-[#2dd4bf]" /> Live Telemetry Feed
-          </span>
-          <span className="text-[#2dd4bf] font-medium text-[11px] bg-[#2dd4bf]/10 px-2 py-0.5 rounded-md border border-[#2dd4bf]/20">
-            {t('gps_active', currentLanguage)}
-          </span>
-        </div>
-
-        <div className="max-h-28 overflow-y-auto space-y-1.5 text-slate-300">
-          {hudData.telemetryHistory.length === 0 ? (
-            <p className="text-slate-400 italic py-2">
-              Click "{t('start_drive', currentLanguage)}" above or start driving to begin recording live telemetry...
-            </p>
-          ) : (
-            hudData.telemetryHistory
-              .slice(-4)
-              .reverse()
-              .map((point, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between hover:bg-slate-800/40 px-3 py-1.5 rounded-lg border border-white/5 transition-colors"
-                >
-                  <span className="text-slate-400 font-mono">
-                    {new Date(point.timestamp).toLocaleTimeString()}
-                  </span>
-                  <span className="text-slate-200">
-                    Speed:{' '}
-                    <strong className="text-[#2dd4bf]">
-                      {(point.velocity * (isImperial ? 0.621371 : 1)).toFixed(1)} {speedUnit}
-                    </strong>
-                  </span>
-                  <span className="text-slate-300">
-                    Ride Stability:{' '}
-                    <strong className="text-emerald-400">
-                      {point.braking_jerk < 1.0 ? 'Optimal' : 'Standard'}
-                    </strong>
-                  </span>
-                </div>
-              ))
-          )}
         </div>
       </div>
 

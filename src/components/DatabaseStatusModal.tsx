@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Database, CheckCircle2, AlertTriangle, RefreshCw, X, Key, Globe, UploadCloud, ShieldCheck, Copy, ArrowRight, Code } from 'lucide-react';
-import { getSupabaseUrl, getSupabaseAnonKey, saveSupabaseConfig, testSupabaseConnection, isSupabaseConfigured } from '../lib/supabaseClient';
+import { Database, CheckCircle2, AlertTriangle, RefreshCw, X, Key, Globe, UploadCloud, ShieldCheck, Copy } from 'lucide-react';
+import { getSupabaseUrl, getSupabaseAnonKey, saveSupabaseConfig, testSupabaseConnection } from '../lib/supabaseClient';
 import { getAllAccounts, saveAccountAsync } from '../lib/accountManager';
 
 interface DatabaseStatusModalProps {
@@ -30,11 +30,9 @@ export const DatabaseStatusModal: React.FC<DatabaseStatusModalProps> = ({ isOpen
     setIsTesting(true);
     setTestResult(null);
 
-    // 1. Client Test
     const clientRes = await testSupabaseConnection();
     setTestResult(clientRes);
 
-    // 2. Server Test
     try {
       const headers: Record<string, string> = {};
       const u = urlInput || getSupabaseUrl();
@@ -57,7 +55,6 @@ export const DatabaseStatusModal: React.FC<DatabaseStatusModalProps> = ({ isOpen
   const handleSaveCredentials = (e: React.FormEvent) => {
     e.preventDefault();
     if (!urlInput.trim() || !keyInput.trim()) {
-      alert('Please enter both Supabase URL and Anon Key.');
       return;
     }
     saveSupabaseConfig(urlInput.trim(), keyInput.trim());
@@ -86,9 +83,9 @@ export const DatabaseStatusModal: React.FC<DatabaseStatusModalProps> = ({ isOpen
       }
 
       if (successCount > 0) {
-        setSyncMessage(`Successfully synced ${successCount} account(s) to Supabase!${lastErr ? ` (Notice: ${lastErr})` : ''}`);
+        setSyncMessage(`Successfully synced ${successCount} account(s) to Supabase!`);
       } else {
-        setSyncMessage(`Sync failed: ${lastErr}`);
+        setSyncMessage(`Sync status: ${lastErr}`);
       }
       runDiagnostics();
     } catch (err: any) {
@@ -98,231 +95,113 @@ export const DatabaseStatusModal: React.FC<DatabaseStatusModalProps> = ({ isOpen
     }
   };
 
-  const handleCopySchemaSql = () => {
-    const sql = `-- DriveSafe Youth Initiative - Supabase Database Schema
-CREATE TABLE IF NOT EXISTS public.driver_accounts (
-    username TEXT PRIMARY KEY,
-    full_name TEXT,
-    phone TEXT,
-    email TEXT,
-    parent_name TEXT,
-    parent_phone TEXT,
-    parent_email TEXT,
-    safety_score NUMERIC DEFAULT 100.0,
-    clean_trips INT DEFAULT 0,
-    total_trips INT DEFAULT 0,
-    total_distance_miles NUMERIC DEFAULT 0.0,
-    points INT DEFAULT 0,
-    level INT DEFAULT 1,
-    current_xp INT DEFAULT 0,
-    next_level_xp INT DEFAULT 1000,
-    badges_unlocked TEXT[] DEFAULT ARRAY[]::TEXT[],
-    trip_history JSONB DEFAULT '[]'::jsonb,
-    account_data JSONB DEFAULT '{}'::jsonb,
-    created_time BIGINT DEFAULT (EXTRACT(epoch FROM NOW()) * 1000),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-ALTER TABLE public.driver_accounts ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Allow public select driver_accounts" ON public.driver_accounts;
-CREATE POLICY "Allow public select driver_accounts" ON public.driver_accounts FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Allow public insert driver_accounts" ON public.driver_accounts;
-CREATE POLICY "Allow public insert driver_accounts" ON public.driver_accounts FOR INSERT WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow public update driver_accounts" ON public.driver_accounts;
-CREATE POLICY "Allow public update driver_accounts" ON public.driver_accounts FOR UPDATE USING (true);
-DROP POLICY IF EXISTS "Allow public delete driver_accounts" ON public.driver_accounts;
-CREATE POLICY "Allow public delete driver_accounts" ON public.driver_accounts FOR DELETE USING (true);
-GRANT ALL ON public.driver_accounts TO anon, authenticated, postgres, service_role;
-
-CREATE TABLE IF NOT EXISTS public.road_hazards (
-    id TEXT PRIMARY KEY,
-    hazard_type TEXT NOT NULL,
-    description TEXT NOT NULL,
-    lat DOUBLE PRECISION NOT NULL,
-    lng DOUBLE PRECISION NOT NULL,
-    upvotes INT DEFAULT 1,
-    source_app TEXT DEFAULT 'WEB_APP',
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-ALTER TABLE public.road_hazards ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Allow public select road_hazards" ON public.road_hazards;
-CREATE POLICY "Allow public select road_hazards" ON public.road_hazards FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Allow public insert road_hazards" ON public.road_hazards;
-CREATE POLICY "Allow public insert road_hazards" ON public.road_hazards FOR INSERT WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow public update road_hazards" ON public.road_hazards;
-CREATE POLICY "Allow public update road_hazards" ON public.road_hazards FOR UPDATE USING (true);
-DROP POLICY IF EXISTS "Allow public delete road_hazards" ON public.road_hazards;
-CREATE POLICY "Allow public delete road_hazards" ON public.road_hazards FOR DELETE USING (true);
-GRANT ALL ON public.road_hazards TO anon, authenticated, postgres, service_role;`;
-
-    navigator.clipboard.writeText(sql);
-    setCopiedSchema(true);
-    setTimeout(() => setCopiedSchema(false), 3000);
-  };
-
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-fade-in overflow-y-auto">
-      <div className="glass-card max-w-lg w-full p-6 border border-[#2dd4bf]/30 shadow-2xl relative my-8 overflow-hidden text-left">
-        <div className="absolute -right-12 -top-12 w-48 h-48 bg-[#2dd4bf]/10 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Close Button */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/60 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="luxury-card max-w-xl w-full p-6 sm:p-7 border border-[#C5A880]/30 shadow-2xl relative text-left max-h-[90vh] overflow-y-auto text-stone-900">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-lg bg-slate-800/60 text-slate-400 hover:text-white transition-colors cursor-pointer"
+          className="absolute top-4 right-4 p-1.5 rounded-lg bg-stone-100 text-stone-400 hover:text-stone-700 transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
 
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex items-center gap-3 border-b border-white/10 pb-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#2dd4bf] to-[#38bdf8] p-0.5 shadow-lg glow-mint flex items-center justify-center shrink-0">
-              <div className="w-full h-full bg-[#020617] rounded-[14px] flex items-center justify-center">
-                <Database className="w-6 h-6 text-[#2dd4bf]" />
-              </div>
+        <div className="space-y-5">
+          <div className="flex items-center gap-3 border-b border-stone-100 pb-4">
+            <div className="w-10 h-10 rounded-2xl bg-stone-900 text-[#C5A880] flex items-center justify-center">
+              <Database className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-xl font-black text-white font-display">Supabase Cloud Database Status</h3>
-              <p className="text-xs text-slate-300 font-medium">Verify connection & sync driver accounts to Supabase</p>
+              <h3 className="text-lg font-bold text-stone-900 font-display">Supabase Cloud Database Diagnostics</h3>
+              <p className="text-xs text-stone-500">Live multi-device telematics sync and account persistence.</p>
             </div>
           </div>
 
-          {/* Diagnostic Status Box */}
-          <div className="p-4 rounded-xl bg-[#020617]/80 border border-white/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-[#2dd4bf]" /> Live Diagnostics
+          {/* Test Status Bar */}
+          <div className="p-4 rounded-xl bg-stone-50 border border-stone-200 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-stone-900 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-[#A38258]" /> Database Sync Status
               </span>
-
               <button
                 onClick={runDiagnostics}
                 disabled={isTesting}
-                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                className="text-[#A38258] hover:underline font-bold flex items-center gap-1 cursor-pointer"
               >
-                <RefreshCw className={`w-3 h-3 ${isTesting ? 'animate-spin text-[#2dd4bf]' : ''}`} />
-                <span>Test Connection</span>
+                <RefreshCw className={`w-3 h-3 ${isTesting ? 'animate-spin' : ''}`} />
+                <span>{isTesting ? 'Checking...' : 'Run Check'}</span>
               </button>
             </div>
 
             {testResult && (
               <div
-                className={`p-3 rounded-lg border text-xs leading-relaxed ${
+                className={`p-2.5 rounded-lg text-xs flex items-center gap-2 border ${
                   testResult.success
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                    : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : 'bg-amber-50 text-amber-800 border-amber-200'
                 }`}
               >
-                <div className="font-bold flex items-center gap-1.5 mb-1">
-                  {testResult.success ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  ) : (
-                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                  )}
-                  <span>{testResult.success ? 'Supabase Connected' : 'Supabase Status Notice'}</span>
-                </div>
-                <p>{testResult.message}</p>
-              </div>
-            )}
-
-            {serverStatus && (
-              <div className="text-[11px] text-slate-400 space-y-1 font-mono pt-1 border-t border-white/5">
-                <div>Server API Status: <span className="text-white font-bold">{serverStatus.status}</span></div>
-                {serverStatus.writePermission !== undefined && (
-                  <div>Write Permission: <span className={serverStatus.writePermission ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>{serverStatus.writePermission ? 'CONFIRMED' : 'RESTRICTED'}</span></div>
+                {testResult.success ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                 )}
-                {serverStatus.message && <div>Server Message: <span className="text-slate-300">{serverStatus.message}</span></div>}
+                <span>{testResult.message}</span>
               </div>
             )}
           </div>
 
-          {/* Schema Copy Action */}
-          <div className="p-3.5 rounded-xl bg-slate-900/60 border border-white/10 flex items-center justify-between">
-            <div className="space-y-0.5">
-              <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                <Code className="w-3.5 h-3.5 text-[#2dd4bf]" /> Supabase SQL Schema
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Copy SQL code to paste in Supabase SQL Editor to create tables & policies.
-              </p>
-            </div>
-
-            <button
-              onClick={handleCopySchemaSql}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-white/10 flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
-            >
-              <Copy className="w-3.5 h-3.5 text-[#2dd4bf]" />
-              <span>{copiedSchema ? 'Copied!' : 'Copy SQL'}</span>
-            </button>
-          </div>
-
-          {/* Sync All Accounts Action */}
-          <div className="p-4 rounded-xl bg-gradient-to-r from-[#2dd4bf]/10 to-[#38bdf8]/10 border border-[#2dd4bf]/30 space-y-3">
+          {/* Account Sync Action */}
+          <div className="p-4 rounded-xl bg-[#F9F7F2] border border-[#C5A880]/30 space-y-2">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <UploadCloud className="w-4 h-4 text-[#2dd4bf]" /> Push Accounts to Supabase
-                </div>
-                <p className="text-[11px] text-slate-300 mt-0.5">
-                  Force-sync registered driver accounts into your Supabase <code className="text-[#2dd4bf] font-mono">driver_accounts</code> table.
-                </p>
+                <span className="text-xs font-bold text-stone-900 block">Manual Account Push</span>
+                <span className="text-[10px] text-stone-500">Push local cached profiles to remote Supabase tables</span>
               </div>
+              <button
+                onClick={handleSyncAllAccounts}
+                disabled={isSyncing}
+                className="btn-gold px-3.5 py-1.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <UploadCloud className="w-3.5 h-3.5" />
+                <span>{isSyncing ? 'Syncing...' : 'Sync Accounts'}</span>
+              </button>
             </div>
 
-            <button
-              onClick={handleSyncAllAccounts}
-              disabled={isSyncing}
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#2dd4bf] to-[#38bdf8] text-slate-950 font-extrabold text-xs hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'Syncing to Supabase...' : 'Sync All Accounts to Supabase Now'}</span>
-            </button>
-
             {syncMessage && (
-              <p className="text-xs font-semibold text-emerald-400 pt-1">{syncMessage}</p>
+              <p className="text-xs font-semibold text-stone-800 pt-1">{syncMessage}</p>
             )}
           </div>
 
-          {/* Credentials Form */}
-          <form onSubmit={handleSaveCredentials} className="space-y-4 pt-2 border-t border-white/10">
-            <div className="text-xs font-bold text-white uppercase tracking-wider">
-              Supabase Project Credentials
-            </div>
-
+          {/* Form */}
+          <form onSubmit={handleSaveCredentials} className="space-y-3 pt-2 border-t border-stone-100">
+            <span className="card-title block">Supabase Credentials Override</span>
             <div>
-              <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1">
-                <Globe className="w-3 h-3 text-[#2dd4bf]" /> Supabase URL
-              </label>
+              <label className="text-[11px] font-bold text-stone-600 block mb-1">Project URL</label>
               <input
                 type="text"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
-                placeholder="https://your-project.supabase.co"
-                className="w-full px-3 py-2 rounded-lg bg-[#020617] border border-white/20 text-white placeholder-slate-500 text-xs font-mono focus:outline-none focus:border-[#2dd4bf]"
+                placeholder="https://xyz.supabase.co"
+                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-mono text-stone-900 focus:outline-none focus:border-[#C5A880]"
               />
             </div>
-
             <div>
-              <label className="block text-[11px] font-bold text-slate-300 mb-1 flex items-center gap-1">
-                <Key className="w-3 h-3 text-[#2dd4bf]" /> Supabase Anon / Public Key
-              </label>
-              <textarea
+              <label className="text-[11px] font-bold text-stone-600 block mb-1">Anon Public API Key</label>
+              <input
+                type="password"
                 value={keyInput}
                 onChange={(e) => setKeyInput(e.target.value)}
-                rows={2}
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                className="w-full px-3 py-2 rounded-lg bg-[#020617] border border-white/20 text-white placeholder-slate-500 text-xs font-mono focus:outline-none focus:border-[#2dd4bf] resize-none"
+                placeholder="eyJhbGciOi..."
+                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-mono text-stone-900 focus:outline-none focus:border-[#C5A880]"
               />
             </div>
-
             <button
               type="submit"
-              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-white/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              className="w-full btn-gold py-2 rounded-xl text-xs cursor-pointer"
             >
-              <span>Save Credentials & Test</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              Save Credentials
             </button>
           </form>
         </div>
