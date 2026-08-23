@@ -136,10 +136,10 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
               <RadianSymbol size={24} />
             </div>
             <div className="leading-tight">
-              <span className="text-base font-black tracking-tight text-stone-900 font-display">
+              <span className="text-base font-black tracking-[0.18em] text-stone-900 font-display">
                 RADIAN<span className="text-[#A38258]">DRIVE</span>
               </span>
-              <span className="hidden sm:block text-[9px] uppercase tracking-[0.15em] text-stone-400 font-semibold">
+              <span className="hidden sm:block text-[9px] uppercase tracking-[0.2em] text-stone-400 font-semibold font-sans">
                 Precision Telematics
               </span>
             </div>

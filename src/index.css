@@ -4,19 +4,19 @@
   --canvas-bg: #FBF9F5;
   --canvas-surface: #FFFFFF;
   --canvas-subtle: #F4F0E8;
-  --canvas-card: rgba(255, 255, 255, 0.85);
+  --canvas-card: rgba(255, 255, 255, 0.90);
   
   --gold-primary: #C5A880;
-  --gold-dark: #A38258;
+  --gold-dark: #9E7D52;
   --gold-light: #F4ECE1;
-  --gold-glow: rgba(197, 168, 128, 0.25);
+  --gold-glow: rgba(197, 168, 128, 0.22);
   
   --ink-primary: #1C1917;
-  --ink-secondary: #57534E;
+  --ink-secondary: #44403C;
   --ink-muted: #78716C;
   --ink-faint: #A8A29E;
 
-  --emerald-safe: #059669;
+  --emerald-safe: #047857;
   --emerald-bg: #ECFDF5;
   --amber-warn: #D97706;
   --rose-alert: #E11D48;
@@ -29,37 +29,48 @@
 body {
   background-color: var(--canvas-bg);
   background-image: 
-    radial-gradient(circle at 15% 10%, rgba(244, 236, 225, 0.7) 0%, transparent 50%),
-    radial-gradient(circle at 85% 85%, rgba(239, 235, 226, 0.6) 0%, transparent 50%);
+    radial-gradient(circle at 12% 8%, rgba(244, 236, 225, 0.75) 0%, transparent 45%),
+    radial-gradient(circle at 88% 92%, rgba(239, 235, 226, 0.65) 0%, transparent 45%);
   background-attachment: fixed;
   color: var(--ink-primary);
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow-x: hidden;
   margin: 0;
   min-height: 100vh;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.012em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
+/* Precision Typographic Roles */
 .font-display {
-  font-family: 'Syne', 'Plus Jakarta Sans', sans-serif;
-  letter-spacing: -0.02em;
+  font-family: 'Outfit', 'Plus Jakarta Sans', -apple-system, sans-serif;
+  letter-spacing: -0.025em;
+}
+
+.font-brand {
+  font-family: 'Syncopate', 'Outfit', sans-serif;
+  letter-spacing: 0.22em;
 }
 
 .font-serif-luxury {
   font-family: 'Cinzel', serif;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
 .font-mono-num {
   font-family: 'JetBrains Mono', monospace;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
-/* Luxury Glass Card with Soft Warm Glow */
+/* Luxury Glass Card with Soft Warm Boundary */
 .luxury-card {
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--border-soft);
   border-radius: 1.5rem;
   box-shadow: var(--shadow-luxury);
@@ -78,11 +89,13 @@ body {
   box-shadow: 0 4px 16px -2px rgba(28, 25, 23, 0.03);
 }
 
+/* Micro Header / Section Label */
 .card-title {
-  font-size: 0.7rem;
+  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   color: var(--ink-muted);
   margin-bottom: 6px;
 }
@@ -91,14 +104,16 @@ body {
 .btn-gold {
   background: linear-gradient(135deg, #D4B68D 0%, #B8976C 100%);
   color: #1C1917;
+  font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
   font-weight: 700;
-  box-shadow: 0 4px 14px -1px rgba(184, 151, 108, 0.35);
-  transition: all 0.2s ease;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 14px -1px rgba(184, 151, 108, 0.32);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .btn-gold:hover {
   background: linear-gradient(135deg, #DEBF97 0%, #C4A174 100%);
-  box-shadow: 0 6px 20px -2px rgba(184, 151, 108, 0.45);
+  box-shadow: 0 6px 20px -2px rgba(184, 151, 108, 0.42);
   transform: translateY(-1px);
 }
 
@@ -111,20 +126,20 @@ body {
   width: 260px;
   height: 260px;
   border-radius: 50%;
-  border: 1.5px solid rgba(197, 168, 128, 0.3);
+  border: 1.5px solid rgba(197, 168, 128, 0.32);
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.95) 0%, rgba(244, 240, 232, 0.5) 100%);
-  box-shadow: 0 12px 35px -5px rgba(197, 168, 128, 0.18), inset 0 0 20px rgba(197, 168, 128, 0.06);
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.98) 0%, rgba(246, 242, 235, 0.6) 100%);
+  box-shadow: 0 14px 40px -5px rgba(197, 168, 128, 0.18), inset 0 0 24px rgba(197, 168, 128, 0.06);
 }
 
 /* Custom Minimalist Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -137,5 +152,5 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(197, 168, 128, 0.4);
+  background: rgba(197, 168, 128, 0.5);
 }

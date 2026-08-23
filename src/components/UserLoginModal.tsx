@@ -149,7 +149,7 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
               <div className="w-14 h-14 rounded-2xl bg-stone-900 text-[#C5A880] flex items-center justify-center mx-auto shadow-md">
                 <RadianSymbol size={32} />
               </div>
-              <h2 className="text-2xl font-black text-stone-900 font-display uppercase tracking-tight">
+              <h2 className="text-2xl font-black text-stone-900 font-display uppercase tracking-[0.2em]">
                 RADIAN<span className="text-[#A38258]">DRIVE</span>
               </h2>
               <p className="text-xs text-stone-500 max-w-sm mx-auto">
