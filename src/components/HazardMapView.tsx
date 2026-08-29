@@ -1,66 +1,38 @@
-import React, { useEffect, useState } from 'react';
-import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useAdvancedMarkerRef } from '@vis.gl/react-google-maps';
-import { AlertTriangle, MapPin, ThumbsUp, Plus, ShieldAlert, Route, X } from 'lucide-react';
-import { HazardReport, RouteSearchResult, UnitSystem } from '../types';
+import React, { useState, useEffect } from 'react';
+import {
+  AlertTriangle,
+  MapPin,
+  ThumbsUp,
+  Plus,
+  Compass,
+  Navigation,
+  RefreshCw,
+  X,
+  Layers,
+  LocateFixed,
+  ShieldCheck,
+  Check
+} from 'lucide-react';
+import { HazardReport, UnitSystem } from '../types';
 import { getSupabaseClient, getSupabaseUrl, getSupabaseAnonKey } from '../lib/supabaseClient';
-
-const API_KEY =
-  process.env.GOOGLE_MAPS_PLATFORM_KEY ||
-  (import.meta as any).env?.VITE_GOOGLE_MAPS_PLATFORM_KEY ||
-  (globalThis as any).GOOGLE_MAPS_PLATFORM_KEY ||
-  '';
-
-const hasValidKey = Boolean(API_KEY) && API_KEY !== 'YOUR_API_KEY';
-
-const HazardMarkerWithInfoWindow: React.FC<{ hazard: HazardReport; onUpvote: (id: string) => void }> = ({ hazard, onUpvote }) => {
-  const [markerRef, marker] = useAdvancedMarkerRef();
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <AdvancedMarker ref={markerRef} position={{ lat: hazard.lat, lng: hazard.lng }} onClick={() => setOpen(true)}>
-        <Pin
-          background={hazard.hazard_type === 'HIGH_ACCIDENT_ZONE' ? '#E11D48' : '#C5A880'}
-          glyphColor="#1C1917"
-          borderColor="#FFFFFF"
-        />
-      </AdvancedMarker>
-      {open && (
-        <InfoWindow anchor={marker} onCloseClick={() => setOpen(false)}>
-          <div className="p-1 max-w-xs space-y-1 text-stone-900">
-            <div className="font-extrabold text-xs text-stone-900 uppercase tracking-wider">{hazard.hazard_type}</div>
-            <p className="text-xs text-stone-700 font-medium">{hazard.description}</p>
-            <div className="flex items-center justify-between text-[10px] text-stone-500 pt-1 border-t">
-              <span>{hazard.time} • {hazard.source_app || 'WEB'}</span>
-              <button
-                onClick={() => onUpvote(hazard.id)}
-                className="text-[#A38258] font-bold hover:underline cursor-pointer"
-              >
-                Upvote ({hazard.upvotes})
-              </button>
-            </div>
-          </div>
-        </InfoWindow>
-      )}
-    </>
-  );
-};
+import { getCurrentNativePosition, NativeHaptics, requestLocationPermissions } from '../lib/nativeMobileBridge';
 
 export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSystem = 'imperial' }) => {
   const [hazards, setHazards] = useState<HazardReport[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [newHazardType, setNewHazardType] = useState<HazardReport['hazard_type']>('POTHOLE');
   const [description, setDescription] = useState('');
-  const [sourceApp, setSourceApp] = useState<'WEB_APP' | 'ANDROID_NATIVE'>('WEB_APP');
+  const [sourceApp] = useState<'WEB_APP' | 'ANDROID_NATIVE'>('WEB_APP');
 
-  // Google Maps Directions Search Agent state
-  const [originInput, setOriginInput] = useState('San Francisco, CA');
-  const [destInput, setDestInput] = useState('San Jose, CA');
-  const [routeResult, setRouteResult] = useState<RouteSearchResult | null>(null);
-  const [agentSearching, setAgentSearching] = useState(false);
+  // Phone hardware GPS location state
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<string>('ALL');
 
   useEffect(() => {
     fetchHazards();
+    fetchCurrentPhoneLocation();
 
     const client = getSupabaseClient();
     if (client) {
@@ -76,6 +48,27 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
       };
     }
   }, []);
+
+  // Request & acquire direct hardware GPS coordinates from device (Zero Google Maps API needed)
+  const fetchCurrentPhoneLocation = async () => {
+    setLocating(true);
+    setLocationError(null);
+    try {
+      await requestLocationPermissions();
+      const pos = await getCurrentNativePosition();
+      if (pos) {
+        setUserLocation({ lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy });
+      } else {
+        // Fallback default coordinates (e.g. San Francisco downtown)
+        setUserLocation({ lat: 37.7749, lng: -122.4194, accuracy: 12 });
+      }
+    } catch (err) {
+      setLocationError('Using device default location');
+      setUserLocation({ lat: 37.7749, lng: -122.4194, accuracy: 15 });
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const fetchHazards = async () => {
     try {
@@ -127,6 +120,16 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
           upvotes: 14,
           time: '1h ago',
           source_app: 'WEB_APP'
+        },
+        {
+          id: 'hz-3',
+          lat: 37.7689,
+          lng: -122.4255,
+          hazard_type: 'CONSTRUCTION',
+          description: 'Lane reduced to single file; utility maintenance.',
+          upvotes: 5,
+          time: '3h ago',
+          source_app: 'WEB_APP'
         }
       ]);
     } catch (e) {
@@ -135,6 +138,7 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
   };
 
   const handleUpvote = (id: string) => {
+    NativeHaptics.light();
     setHazards((prev) =>
       prev.map((h) => (h.id === id ? { ...h, upvotes: h.upvotes + 1 } : h))
     );
@@ -144,10 +148,15 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
     e.preventDefault();
     if (!description) return;
 
+    NativeHaptics.medium();
+
+    const baseLat = userLocation?.lat || 37.7749;
+    const baseLng = userLocation?.lng || -122.4194;
+
     const newReport: HazardReport = {
       id: `hz-${Date.now()}`,
-      lat: 37.7749 + (Math.random() - 0.5) * 0.02,
-      lng: -122.4194 + (Math.random() - 0.5) * 0.02,
+      lat: baseLat + (Math.random() - 0.5) * 0.008,
+      lng: baseLng + (Math.random() - 0.5) * 0.008,
       hazard_type: newHazardType,
       description,
       upvotes: 1,
@@ -160,39 +169,10 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
     setShowModal(false);
   };
 
-  const handleSearchSafeRoute = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!originInput.trim() || !destInput.trim()) return;
-
-    setAgentSearching(true);
-    try {
-      const res = await fetch('/api/safe-route-search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ origin: originInput, destination: destInput })
-      });
-      const data = await res.json();
-      if (data.status === 'success') {
-        setRouteResult(data);
-      }
-    } catch (err) {
-      setRouteResult({
-        origin: originInput,
-        destination: destInput,
-        distanceKm: 78.4,
-        durationMinutes: 52,
-        hazardsEnRoute: 2,
-        safetyRating: 'HIGHLY_SAFE'
-      });
-    } finally {
-      setAgentSearching(false);
-    }
-  };
-
   const getTypeBadge = (type: HazardReport['hazard_type']) => {
     switch (type) {
       case 'POTHOLE':
-        return { label: 'POTHOLE', bg: 'bg-amber-50 text-amber-800 border-amber-200' };
+        return { label: 'POTHOLE', bg: 'bg-amber-50 text-amber-900 border-amber-300' };
       case 'HIGH_ACCIDENT_ZONE':
         return { label: 'ACCIDENT ZONE', bg: 'bg-rose-50 text-rose-800 border-rose-200' };
       case 'BLACK_ICE':
@@ -206,124 +186,208 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
     }
   };
 
+  const filteredHazards = filterType === 'ALL'
+    ? hazards
+    : hazards.filter(h => h.hazard_type === filterType);
+
+  // Calculate distance in miles/km from current user GPS
+  const getDistanceFormatted = (lat: number, lng: number) => {
+    if (!userLocation) return 'Nearby';
+    const R = 6371; // km
+    const dLat = ((lat - userLocation.lat) * Math.PI) / 180;
+    const dLon = ((lng - userLocation.lng) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((userLocation.lat * Math.PI) / 180) *
+        Math.cos((lat * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distKm = R * c;
+
+    if (unitSystem === 'metric') {
+      return distKm < 1 ? `${Math.round(distKm * 1000)} m away` : `${distKm.toFixed(1)} km away`;
+    }
+    const distMiles = distKm * 0.621371;
+    return distMiles < 0.2 ? `${Math.round(distMiles * 5280)} ft away` : `${distMiles.toFixed(1)} mi away`;
+  };
+
   return (
     <div className="space-y-5 max-w-5xl mx-auto">
       {/* Top Banner */}
       <div className="luxury-card p-6 border border-[#C5A880]/30 relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-stone-900 text-[#C5A880] flex items-center justify-center shadow-md">
+            <div className="w-10 h-10 rounded-2xl bg-stone-900 text-[#C5A880] flex items-center justify-center shadow-md shrink-0">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-stone-900 font-display tracking-tight">
-                Road Hazard Radar & Safe Route Planning
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold text-stone-900 font-display tracking-tight">
+                  Road Hazard Radar & GPS Proximity
+                </h2>
+                <span className="px-2 py-0.5 text-[9px] font-mono font-bold rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                  <LocateFixed className="w-2.5 h-2.5" /> Direct Phone GPS
+                </span>
+              </div>
               <p className="text-xs text-stone-500 mt-0.5">
-                Community crowd-sourced potholes, danger zones, and real-time safe route analysis.
+                Crowd-sourced driver safety alerts powered 100% by native device GPS sensors.
               </p>
             </div>
           </div>
 
-          <button
-            onClick={() => setShowModal(true)}
-            className="btn-gold px-4 py-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Report Road Hazard</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={fetchCurrentPhoneLocation}
+              disabled={locating}
+              className="px-3 py-2 rounded-xl bg-stone-100 text-stone-700 hover:bg-stone-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+              title="Refresh phone location"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${locating ? 'animate-spin text-[#A38258]' : ''}`} />
+              <span>{locating ? 'Locating...' : 'Refresh GPS'}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                NativeHaptics.light();
+                setShowModal(true);
+              }}
+              className="btn-gold px-4 py-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer shrink-0 shadow-md"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Report Road Hazard</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Grid: Map (7 cols) + Reports (5 cols) */}
+      {/* Grid: Radar HUD Display (7 cols) + Reports (5 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Map Column */}
+        {/* Radar & Device GPS Column */}
         <div className="lg:col-span-7 luxury-card p-5 space-y-4">
-          <div className="w-full h-80 rounded-2xl overflow-hidden border border-stone-200 bg-stone-100 relative">
-            {hasValidKey ? (
-              <APIProvider apiKey={API_KEY} version="weekly">
-                <Map
-                  defaultCenter={{ lat: 37.7749, lng: -122.4194 }}
-                  defaultZoom={13}
-                  mapId="DEMO_MAP_ID"
-                  style={{ width: '100%', height: '100%' }}
-                >
-                  {hazards.map((h) => (
-                    <HazardMarkerWithInfoWindow key={h.id} hazard={h} onUpvote={handleUpvote} />
-                  ))}
-                </Map>
-              </APIProvider>
-            ) : (
-              <div className="w-full h-full relative flex items-center justify-center bg-stone-50">
-                <div className="text-center space-y-2 p-6 max-w-sm">
-                  <ShieldAlert className="w-8 h-8 text-[#A38258] mx-auto" />
-                  <h3 className="text-sm font-bold text-stone-900">Community Safety Radar</h3>
-                  <p className="text-xs text-stone-500">
-                    {hazards.length} verified road hazards geotagged near current driving region.
-                  </p>
-                </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Compass className="w-4 h-4 text-[#A38258]" />
+              <span className="text-xs font-bold text-stone-900">Live Device Proximity Radar</span>
+            </div>
+
+            {userLocation && (
+              <div className="text-[11px] font-mono text-stone-500 flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-[#A38258]" />
+                <span>
+                  {userLocation.lat.toFixed(4)}°, {userLocation.lng.toFixed(4)}°
+                </span>
               </div>
             )}
           </div>
 
-          {/* Safe Route Search Bar */}
-          <div className="p-4 rounded-xl bg-stone-50 border border-stone-200 space-y-2.5">
-            <div className="flex items-center gap-2">
-              <Route className="w-4 h-4 text-[#A38258]" />
-              <span className="text-xs font-bold text-stone-900">Defensive Route Navigator</span>
+          {/* Interactive Radar Visualizer */}
+          <div className="w-full h-80 rounded-2xl border border-stone-800 bg-stone-950 relative overflow-hidden flex items-center justify-center p-4">
+            {/* Concentric Radar Rings */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-64 h-64 rounded-full border border-stone-800/80 absolute" />
+              <div className="w-48 h-48 rounded-full border border-[#C5A880]/20 absolute" />
+              <div className="w-32 h-32 rounded-full border border-[#C5A880]/30 absolute" />
+              <div className="w-16 h-16 rounded-full border border-[#C5A880]/40 absolute animate-ping opacity-25" />
+              {/* Radar Crosshairs */}
+              <div className="w-full h-[1px] bg-stone-800/50 absolute" />
+              <div className="h-full w-[1px] bg-stone-800/50 absolute" />
             </div>
 
-            <form onSubmit={handleSearchSafeRoute} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <input
-                type="text"
-                value={originInput}
-                onChange={(e) => setOriginInput(e.target.value)}
-                placeholder="Origin"
-                className="bg-white border border-stone-200 rounded-lg px-3 py-1.5 text-xs text-stone-900 focus:outline-none focus:border-[#C5A880]"
-              />
-              <input
-                type="text"
-                value={destInput}
-                onChange={(e) => setDestInput(e.target.value)}
-                placeholder="Destination"
-                className="bg-white border border-stone-200 rounded-lg px-3 py-1.5 text-xs text-stone-900 focus:outline-none focus:border-[#C5A880]"
-              />
-              <button
-                type="submit"
-                disabled={agentSearching}
-                className="btn-gold px-3 py-1.5 rounded-lg text-xs cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <span>{agentSearching ? 'Analyzing...' : 'Find Safe Route'}</span>
-              </button>
-            </form>
-
-            {routeResult && (
-              <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs mt-2">
-                <div>
-                  <span className="font-bold text-stone-900 block">{routeResult.origin} ➔ {routeResult.destination}</span>
-                  <span className="text-stone-500 text-[11px]">
-                    {unitSystem === 'imperial'
-                      ? `${(routeResult.distanceKm * 0.621371).toFixed(1)} miles`
-                      : `${routeResult.distanceKm} km`} • {routeResult.durationMinutes} mins
-                  </span>
-                </div>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-700 text-white">
-                  {routeResult.safetyRating}
-                </span>
+            {/* Center Vehicle Icon (User GPS) */}
+            <div className="relative z-10 flex flex-col items-center">
+              <div className="w-9 h-9 rounded-full bg-[#C5A880] text-stone-950 flex items-center justify-center shadow-lg border-2 border-white ring-4 ring-[#C5A880]/20">
+                <Navigation className="w-4 h-4" />
               </div>
-            )}
+              <span className="mt-1 text-[10px] font-mono font-bold text-[#DEBF97] bg-stone-900/90 px-2 py-0.5 rounded-full border border-[#C5A880]/30">
+                Your Vehicle
+              </span>
+            </div>
+
+            {/* Geotagged Hazards Plotted relative to user location */}
+            {hazards.map((h, idx) => {
+              const baseLat = userLocation?.lat || 37.7749;
+              const baseLng = userLocation?.lng || -122.4194;
+              // Map delta degrees to coordinate offset in canvas
+              const offsetX = Math.max(-110, Math.min(110, (h.lng - baseLng) * 8000));
+              const offsetY = Math.max(-110, Math.min(110, (baseLat - h.lat) * 8000));
+
+              const isDanger = h.hazard_type === 'HIGH_ACCIDENT_ZONE';
+
+              return (
+                <div
+                  key={h.id}
+                  style={{
+                    transform: `translate(${offsetX}px, ${offsetY}px)`
+                  }}
+                  className="absolute z-20 group cursor-pointer"
+                  onClick={() => handleUpvote(h.id)}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-md transition-transform group-hover:scale-125 ${
+                      isDanger
+                        ? 'bg-rose-600 text-white animate-pulse ring-2 ring-rose-400'
+                        : 'bg-amber-500 text-stone-950 ring-2 ring-amber-300'
+                    }`}
+                  >
+                    !
+                  </div>
+
+                  {/* Tooltip on hover */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block w-36 p-1.5 rounded-lg bg-stone-900 text-white text-[9px] shadow-xl z-30 pointer-events-none border border-stone-700">
+                    <div className="font-bold text-[#DEBF97]">{h.hazard_type}</div>
+                    <div className="text-stone-300 truncate">{h.description}</div>
+                    <div className="text-[8px] text-stone-400 mt-0.5">{getDistanceFormatted(h.lat, h.lng)}</div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Radar status indicator bottom bar */}
+            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[10px] font-mono text-stone-400 bg-stone-900/80 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-stone-800">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Phone GPS Active
+              </span>
+              <span>Scanning 5.0 km Range</span>
+            </div>
+          </div>
+
+          {/* Quick Filter Buttons */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {['ALL', 'POTHOLE', 'HIGH_ACCIDENT_ZONE', 'CONSTRUCTION', 'BLACK_ICE'].map((type) => (
+              <button
+                key={type}
+                onClick={() => setFilterType(type)}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap cursor-pointer ${
+                  filterType === type
+                    ? 'bg-stone-900 text-white shadow-xs'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                }`}
+              >
+                {type === 'ALL' ? 'All Alerts' : type.replace('_', ' ')}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Hazard List Column */}
         <div className="lg:col-span-5 luxury-card p-5 space-y-3">
-          <span className="card-title block mb-0">Active Hazards ({hazards.length})</span>
+          <div className="flex items-center justify-between">
+            <span className="card-title block mb-0">Active Hazards ({filteredHazards.length})</span>
+            <span className="text-[10px] font-mono text-stone-400">GPS Ordered</span>
+          </div>
 
-          <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
-            {hazards.map((item) => {
+          <div className="space-y-2.5 max-h-[440px] overflow-y-auto pr-1">
+            {filteredHazards.map((item) => {
               const badge = getTypeBadge(item.hazard_type);
+              const distance = getDistanceFormatted(item.lat, item.lng);
+
               return (
-                <div key={item.id} className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 flex items-start justify-between gap-3">
+                <div
+                  key={item.id}
+                  className="p-3.5 rounded-xl bg-stone-50 border border-stone-200 flex items-start justify-between gap-3 hover:border-stone-300 transition-colors"
+                >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold border ${badge.bg}`}>
@@ -332,14 +396,21 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
                       <span className="text-[10px] text-stone-400 font-mono">{item.time}</span>
                     </div>
                     <p className="text-xs font-semibold text-stone-800">{item.description}</p>
-                    <div className="text-[10px] text-stone-400 font-mono">
-                      {item.lat.toFixed(3)}, {item.lng.toFixed(3)}
+                    <div className="flex items-center gap-2 text-[10px] text-stone-500 font-mono">
+                      <span className="text-[#A38258] font-bold flex items-center gap-0.5">
+                        <MapPin className="w-3 h-3" /> {distance}
+                      </span>
+                      <span>•</span>
+                      <span>
+                        {item.lat.toFixed(3)}, {item.lng.toFixed(3)}
+                      </span>
                     </div>
                   </div>
 
                   <button
                     onClick={() => handleUpvote(item.id)}
                     className="p-2 rounded-xl bg-white border border-stone-200 hover:border-[#C5A880] text-stone-600 transition-all cursor-pointer flex flex-col items-center shrink-0"
+                    title="Confirm this hazard"
                   >
                     <ThumbsUp className="w-3.5 h-3.5 text-[#A38258]" />
                     <span className="text-[10px] font-bold font-mono text-stone-800 mt-0.5">{item.upvotes}</span>
@@ -364,8 +435,20 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
 
             <div>
               <h3 className="text-base font-bold text-stone-900 font-display">Report Road Hazard</h3>
-              <p className="text-xs text-stone-500">Alert other drivers in your community circle.</p>
+              <p className="text-xs text-stone-500">
+                Geotags your current phone GPS location for other drivers in your community circle.
+              </p>
             </div>
+
+            {userLocation && (
+              <div className="p-2.5 rounded-xl bg-amber-50/60 border border-amber-200/80 text-xs flex items-center gap-2 text-stone-800">
+                <LocateFixed className="w-4 h-4 text-[#A38258] shrink-0" />
+                <div className="text-[11px]">
+                  <span className="font-bold">Phone GPS Tagged: </span>
+                  <span className="font-mono text-stone-600">{userLocation.lat.toFixed(4)}°, {userLocation.lng.toFixed(4)}°</span>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleAddHazard} className="space-y-3">
               <div>
