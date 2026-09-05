@@ -84,6 +84,16 @@ async function startServer() {
     }
   });
 
+  // 5. Download Clean Project ZIP
+  app.get("/api/download-zip", (req, res) => {
+    const zipPath = path.join(process.cwd(), "public", "radiandrive-project.zip");
+    res.download(zipPath, "radiandrive-project.zip", (err) => {
+      if (err) {
+        res.status(500).send("Error downloading project archive");
+      }
+    });
+  });
+
   // Serve Vite in Development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

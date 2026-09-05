@@ -72,21 +72,6 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
 
   const fetchHazards = async () => {
     try {
-      const headers: Record<string, string> = {};
-      const clientUrl = getSupabaseUrl();
-      const clientKey = getSupabaseAnonKey();
-      if (clientUrl) headers['x-supabase-url'] = clientUrl;
-      if (clientKey) headers['x-supabase-key'] = clientKey;
-
-      const res = await fetch('/api/hazards', { headers });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.status === 'success' && Array.isArray(json.hazards) && json.hazards.length > 0) {
-          setHazards(json.hazards);
-          return;
-        }
-      }
-
       const client = getSupabaseClient();
       if (client) {
         const { data, error } = await client
@@ -109,7 +94,7 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
           description: 'Deep pavement pothole in right lane before exit 4B.',
           upvotes: 8,
           time: '15m ago',
-          source_app: 'WEB_APP'
+          source_app: 'IOS_NATIVE'
         },
         {
           id: 'hz-2',
@@ -119,7 +104,7 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
           description: 'High collision intersection near freeway merging point.',
           upvotes: 14,
           time: '1h ago',
-          source_app: 'WEB_APP'
+          source_app: 'IOS_NATIVE'
         },
         {
           id: 'hz-3',
@@ -129,7 +114,7 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
           description: 'Lane reduced to single file; utility maintenance.',
           upvotes: 5,
           time: '3h ago',
-          source_app: 'WEB_APP'
+          source_app: 'IOS_NATIVE'
         }
       ]);
     } catch (e) {
@@ -137,14 +122,21 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
     }
   };
 
-  const handleUpvote = (id: string) => {
+  const handleUpvote = async (id: string) => {
     NativeHaptics.light();
-    setHazards((prev) =>
-      prev.map((h) => (h.id === id ? { ...h, upvotes: h.upvotes + 1 } : h))
-    );
+    const updated = hazards.map((h) => (h.id === id ? { ...h, upvotes: h.upvotes + 1 } : h));
+    setHazards(updated);
+
+    const client = getSupabaseClient();
+    if (client) {
+      const target = updated.find(h => h.id === id);
+      if (target) {
+        await client.from('road_hazards').update({ upvotes: target.upvotes }).eq('id', id);
+      }
+    }
   };
 
-  const handleAddHazard = (e: React.FormEvent) => {
+  const handleAddHazard = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!description) return;
 
@@ -167,6 +159,19 @@ export const HazardMapView: React.FC<{ unitSystem?: UnitSystem }> = ({ unitSyste
     setHazards((prev) => [newReport, ...prev]);
     setDescription('');
     setShowModal(false);
+
+    const client = getSupabaseClient();
+    if (client) {
+      await client.from('road_hazards').insert({
+        id: newReport.id,
+        hazard_type: newReport.hazard_type,
+        description: newReport.description,
+        lat: newReport.lat,
+        lng: newReport.lng,
+        upvotes: 1,
+        source_app: 'IOS_NATIVE'
+      });
+    }
   };
 
   const getTypeBadge = (type: HazardReport['hazard_type']) => {

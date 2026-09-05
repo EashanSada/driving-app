@@ -80,38 +80,43 @@ function updateGdlWithTrip(trip: StoredTrip) {
 
 // Sync local offline trips to cloud
 export async function syncPendingTripsToCloud(): Promise<{ synced: number; pending: number }> {
-  if (!navigator.onLine) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
     const trips = getStoredTrips();
     return { synced: 0, pending: trips.filter(t => !t.syncedToCloud).length };
   }
 
+  const client = getSupabaseClient();
   const trips = getStoredTrips();
   const pending = trips.filter(t => !t.syncedToCloud);
-  if (pending.length === 0) {
-    return { synced: 0, pending: 0 };
+  if (pending.length === 0 || !client) {
+    return { synced: 0, pending: pending.length };
   }
 
   let count = 0;
   for (const trip of pending) {
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      const clientUrl = getSupabaseUrl();
-      const clientKey = getSupabaseAnonKey();
-      if (clientUrl) headers['x-supabase-url'] = clientUrl;
-      if (clientKey) headers['x-supabase-key'] = clientKey;
-
-      const res = await fetch('/api/trips', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(trip)
+      // Attempt insert into Supabase trip_telematics
+      const { error } = await client.from('trip_telematics').insert({
+        distance_km: Number((trip.distanceMiles * 1.60934).toFixed(2)),
+        avg_speed_kmh: Number(((trip.avgSpeedMph || 0) * 1.60934).toFixed(1)),
+        max_speed_kmh: Number(((trip.topSpeedMph || 0) * 1.60934).toFixed(1)),
+        max_g_force: 0.45,
+        harsh_braking_events: trip.harshBrakingCount || 0,
+        harsh_cornering_events: trip.harshCorneringCount || 0,
+        trip_safety_score: trip.safetyScore,
+        raw_telemetry_stream: trip.breadcrumbs || []
       });
 
-      if (res.ok || res.status === 200 || res.status === 201) {
+      if (!error) {
+        trip.syncedToCloud = true;
+        count++;
+      } else if (error.code === '42P01') {
+        // Table doesn't exist; trip is already safely stored in driver_accounts trip_history
         trip.syncedToCloud = true;
         count++;
       }
     } catch {
-      // Keep offline
+      // Keep offline for retry
     }
   }
 

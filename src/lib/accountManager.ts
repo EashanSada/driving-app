@@ -86,9 +86,6 @@ export function purgeAllSystemUserData(): void {
 
     // Mark system as purged
     localStorage.setItem(SYSTEM_PURGE_KEY, 'true');
-
-    // Notify backend server to wipe stale cloud accounts if configured
-    fetch('/api/accounts', { method: 'DELETE' }).catch(() => {});
   } catch (err) {
     console.error('Purge user data error:', err);
   }
@@ -227,30 +224,7 @@ export async function fetchAccountFromSupabase(username: string): Promise<UserAc
   const cleanName = username.trim();
   if (!cleanName) return null;
 
-  // 1. First try Backend Server Cloud Endpoint for seamless multi-device sync
-  try {
-    const headers: Record<string, string> = {};
-    const clientUrl = getSupabaseUrl();
-    const clientKey = getSupabaseAnonKey();
-    if (clientUrl) headers['x-supabase-url'] = clientUrl;
-    if (clientKey) headers['x-supabase-key'] = clientKey;
-
-    const res = await fetch(`/api/accounts?username=${encodeURIComponent(cleanName)}`, { headers });
-    if (res.ok) {
-      const json = await res.json();
-      if (json.status === 'success' && json.account) {
-        const acc: UserAccount = json.account;
-        const allMap = getAccountsMap();
-        allMap[acc.username.toLowerCase()] = acc;
-        localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(allMap));
-        return acc;
-      }
-    }
-  } catch (err) {
-    console.warn('Backend server account query notice:', err);
-  }
-
-  // 2. Secondary: Direct Supabase Client Query
+  // Direct Supabase Client Query for iOS Native
   const client = getSupabaseClient();
   if (client) {
     try {
@@ -306,43 +280,18 @@ export async function fetchAccountFromSupabase(username: string): Promise<UserAc
         return parsedAccount;
       }
     } catch (err) {
-      console.warn('Supabase account fetch notice:', err);
+      console.warn('Direct Supabase account fetch notice:', err);
     }
   }
 
-  return null;
+  // Fallback to local accounts
+  return getAccount(cleanName);
 }
 
 export async function fetchAllAccountsFromSupabase(): Promise<UserAccount[]> {
   const localAccounts = getAllAccounts();
 
-  // 1. Try Server API Endpoint
-  try {
-    const headers: Record<string, string> = {};
-    const clientUrl = getSupabaseUrl();
-    const clientKey = getSupabaseAnonKey();
-    if (clientUrl) headers['x-supabase-url'] = clientUrl;
-    if (clientKey) headers['x-supabase-key'] = clientKey;
-
-    const res = await fetch('/api/accounts', { headers });
-    if (res.ok) {
-      const json = await res.json();
-      if (json.status === 'success' && Array.isArray(json.accounts) && json.accounts.length > 0) {
-        const accountsMap = getAccountsMap();
-        json.accounts.forEach((acc: UserAccount) => {
-          if (acc.username) {
-            accountsMap[acc.username.toLowerCase()] = acc;
-          }
-        });
-        localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(accountsMap));
-        return json.accounts;
-      }
-    }
-  } catch (err) {
-    console.warn('Fetch server accounts notice:', err);
-  }
-
-  // 2. Direct Supabase Client
+  // Direct Supabase Client Query for iOS Native
   const client = getSupabaseClient();
   if (client) {
     try {
@@ -404,8 +353,8 @@ export function saveAccount(account: UserAccount): void {
     allMap[cleanKey] = account;
     localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(allMap));
 
-    // Save to Cloud Server & Supabase asynchronously
-    saveAccountAsync(account).catch(err => console.warn('Background account sync warning:', err));
+    // Save directly to Supabase cloud asynchronously
+    saveAccountAsync(account).catch(err => console.warn('Background Supabase sync warning:', err));
   } catch (err) {
     console.error('Failed to save account:', err);
   }
@@ -413,94 +362,82 @@ export function saveAccount(account: UserAccount): void {
 
 export async function saveAccountAsync(account: UserAccount): Promise<{ success: boolean; message?: string }> {
   const cleanKey = account.username.toLowerCase();
-  let serverSaved = false;
-  let serverError = '';
 
-  // 1. Post to Server Cloud API (syncs across devices)
+  // 1. Ensure saved to local device storage first (offline resilience)
   try {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const clientUrl = getSupabaseUrl();
-    const clientKey = getSupabaseAnonKey();
-    if (clientUrl) headers['x-supabase-url'] = clientUrl;
-    if (clientKey) headers['x-supabase-key'] = clientKey;
-
-    const res = await fetch('/api/accounts', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(account)
-    });
-
-    const json = await res.json();
-    if (res.ok && json.supabaseSaved) {
-      serverSaved = true;
-    } else {
-      serverError = json.supabaseError || json.message || `Server returned status ${res.status}`;
-      console.warn('Server API account sync notice:', serverError);
-    }
-  } catch (err: any) {
-    serverError = err.message || 'Network error sync';
-    console.warn('Server API account sync notice:', err);
+    const allMap = getAccountsMap();
+    allMap[cleanKey] = account;
+    localStorage.setItem(ACCOUNTS_MAP_KEY, JSON.stringify(allMap));
+  } catch {
+    // Local storage warning
   }
 
-  // 2. Post to Supabase direct client if configured
+  // 2. Direct Supabase Client Operation
   const client = getSupabaseClient();
-  if (client) {
-    try {
-      const payload = {
-        username: cleanKey,
-        full_name: account.fullName,
-        phone: account.phone || '',
-        email: account.email || '',
-        parent_name: account.parentName || '',
-        parent_phone: account.parentPhone || '',
-        parent_email: account.parentEmail || '',
-        safety_score: account.safetyScore,
-        clean_trips: account.cleanTrips,
-        total_trips: account.totalTrips,
-        total_distance_miles: account.totalDistanceMiles,
-        points: account.points,
-        level: account.level,
-        current_xp: account.currentXp,
-        next_level_xp: account.nextLevelXp,
-        badges_unlocked: account.badgesUnlocked,
-        trip_history: account.tripHistory,
-        account_data: account,
-        updated_at: new Date().toISOString()
-      };
+  if (!client) {
+    return {
+      success: true,
+      message: 'Saved locally on device. Configure Supabase URL & Key in Database Settings to sync to cloud.'
+    };
+  }
 
-      const { error: upsertErr } = await client.from('driver_accounts').upsert(payload, { onConflict: 'username' });
-      if (!upsertErr) {
-        return { success: true };
-      }
+  try {
+    const payload = {
+      username: cleanKey,
+      full_name: account.fullName,
+      phone: account.phone || '',
+      email: account.email || '',
+      parent_name: account.parentName || '',
+      parent_phone: account.parentPhone || '',
+      parent_email: account.parentEmail || '',
+      safety_score: account.safetyScore,
+      clean_trips: account.cleanTrips,
+      total_trips: account.totalTrips,
+      total_distance_miles: account.totalDistanceMiles,
+      points: account.points,
+      level: account.level,
+      current_xp: account.currentXp,
+      next_level_xp: account.nextLevelXp,
+      badges_unlocked: Array.isArray(account.badgesUnlocked) ? account.badgesUnlocked : [],
+      trip_history: Array.isArray(account.tripHistory) ? account.tripHistory : [],
+      account_data: account,
+      updated_at: new Date().toISOString()
+    };
 
-      const { error: updateErr } = await client.from('driver_accounts').update(payload).eq('username', cleanKey);
-      if (!updateErr) {
-        return { success: true };
-      }
-
-      const { error: insertErr } = await client.from('driver_accounts').insert(payload);
-      if (!insertErr) {
-        return { success: true };
-      }
-
-      return {
-        success: false,
-        message: upsertErr.message || updateErr?.message || insertErr?.message || 'Failed to save to Supabase'
-      };
-    } catch (err: any) {
-      console.warn('Supabase driver_accounts save exception:', err);
-      return { success: false, message: err.message };
+    const { error: upsertErr } = await client.from('driver_accounts').upsert(payload, { onConflict: 'username' });
+    if (!upsertErr) {
+      return { success: true, message: 'Saved and synced to Supabase Cloud!' };
     }
-  }
 
-  if (serverSaved) {
-    return { success: true };
-  }
+    // Fallback: Try update
+    const { error: updateErr } = await client.from('driver_accounts').update(payload).eq('username', cleanKey);
+    if (!updateErr) {
+      return { success: true, message: 'Saved and updated in Supabase Cloud!' };
+    }
 
-  return {
-    success: false,
-    message: serverError || 'Account saved locally.'
-  };
+    // Fallback: Try insert
+    const { error: insertErr } = await client.from('driver_accounts').insert(payload);
+    if (!insertErr) {
+      return { success: true, message: 'Saved and created in Supabase Cloud!' };
+    }
+
+    const err = upsertErr || updateErr || insertErr;
+    let userMsg = err.message;
+    if (err.code === '42P01') {
+      userMsg = 'Table "driver_accounts" does not exist in Supabase. Please run schema.sql in Supabase SQL Editor.';
+    } else if (err.code === '42501' || err.message.includes('row-level security')) {
+      userMsg = 'Supabase Row Level Security policy is blocking inserts. Please run the RLS policies in schema.sql.';
+    }
+
+    console.warn('Supabase save error:', err);
+    return {
+      success: false,
+      message: userMsg
+    };
+  } catch (err: any) {
+    console.warn('Supabase driver_accounts save exception:', err);
+    return { success: false, message: err.message || 'Supabase connection error' };
+  }
 }
 
 export async function createAccountAsync(data: {

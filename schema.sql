@@ -262,8 +262,14 @@ CREATE POLICY "Leaderboard driver scores are public" ON public.driver_scores FOR
 CREATE POLICY "System can manage driver scores" ON public.driver_scores FOR ALL USING (true);
 
 -- Trip Telematics Policies
-CREATE POLICY "Users can read own trips" ON public.trip_telematics FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can log own trips" ON public.trip_telematics FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can read own trips" ON public.trip_telematics;
+DROP POLICY IF EXISTS "Users can log own trips" ON public.trip_telematics;
+DROP POLICY IF EXISTS "Allow public select trip_telematics" ON public.trip_telematics;
+DROP POLICY IF EXISTS "Allow public insert trip_telematics" ON public.trip_telematics;
+
+CREATE POLICY "Allow public select trip_telematics" ON public.trip_telematics FOR SELECT USING (true);
+CREATE POLICY "Allow public insert trip_telematics" ON public.trip_telematics FOR INSERT WITH CHECK (true);
+GRANT ALL ON public.trip_telematics TO anon, authenticated, postgres, service_role;
 
 -- Hazard Reports Policies
 CREATE POLICY "Anyone can view hazard reports" ON public.hazard_reports FOR SELECT USING (true);

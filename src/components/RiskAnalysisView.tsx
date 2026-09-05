@@ -4,6 +4,8 @@ import { RiskAnalysisResult, LanguageCode, UnitSystem } from '../types';
 import { t } from '../translations';
 import { updateLastTripAnalysis } from '../lib/accountManager';
 import { RadianSymbol } from './RadianSymbol';
+import { analyzeRiskLocally } from '../lib/riskAnalyzer';
+import { getLocalCoachAdvice } from '../lib/aiCoachLocal';
 
 interface RiskAnalysisViewProps {
   lastTripSummary: any;
@@ -65,13 +67,8 @@ export const RiskAnalysisView: React.FC<RiskAnalysisViewProps> = ({
         harshCorneringCount: 0
       };
 
-      const res = await fetch('/api/analyze-risk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json();
+      // Native on-device statistical telematics risk analysis
+      const data = analyzeRiskLocally(payload);
       setAnalysisResult(data);
       updateLastTripAnalysis(data);
       fetchAiCoach(data.trip_summary);
@@ -82,21 +79,12 @@ export const RiskAnalysisView: React.FC<RiskAnalysisViewProps> = ({
     }
   };
 
-  const fetchAiCoach = async (summaryData: any) => {
+  const fetchAiCoach = (summaryData: any) => {
     setAiLoading(true);
     try {
-      const res = await fetch('/api/ai-coach', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tripSummary: summaryData,
-          language: currentLanguage
-        })
-      });
-      const data = await res.json();
-      if (data.advice) {
-        setAiCoachAdvice(data.advice);
-      }
+      // Native on-device intelligent safety coach
+      const advice = getLocalCoachAdvice(summaryData, currentLanguage);
+      setAiCoachAdvice(advice);
     } catch (err) {
       console.error('AI Coach error:', err);
     } finally {

@@ -14,7 +14,6 @@ export const DatabaseStatusModal: React.FC<DatabaseStatusModalProps> = ({ isOpen
   const [isTesting, setIsTesting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [serverStatus, setServerStatus] = useState<any>(null);
   const [syncMessage, setSyncMessage] = useState('');
   const [copiedSchema, setCopiedSchema] = useState(false);
 
@@ -30,23 +29,11 @@ export const DatabaseStatusModal: React.FC<DatabaseStatusModalProps> = ({ isOpen
     setIsTesting(true);
     setTestResult(null);
 
-    const clientRes = await testSupabaseConnection();
-    setTestResult(clientRes);
-
     try {
-      const headers: Record<string, string> = {};
-      const u = urlInput || getSupabaseUrl();
-      const k = keyInput || getSupabaseAnonKey();
-      if (u) headers['x-supabase-url'] = u;
-      if (k) headers['x-supabase-key'] = k;
-
-      const res = await fetch('/api/accounts?action=test', { headers });
-      if (res.ok) {
-        const json = await res.json();
-        setServerStatus(json);
-      }
+      const clientRes = await testSupabaseConnection();
+      setTestResult(clientRes);
     } catch (err: any) {
-      setServerStatus({ status: 'error', message: err.message });
+      setTestResult({ success: false, message: err.message || 'Diagnostic check failed' });
     } finally {
       setIsTesting(false);
     }
