@@ -28,7 +28,6 @@ interface NavigationHeaderProps {
   activeUsername: string | null;
   activeAccount: UserAccount | null;
   onOpenLoginModal: () => void;
-  onOpenDbModal?: () => void;
 }
 
 export const NavigationHeader: React.FC<NavigationHeaderProps> = ({

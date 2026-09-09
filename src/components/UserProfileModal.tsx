@@ -1,6 +1,7 @@
-import React from 'react';
-import { User, Phone, Mail, LogOut, X, Calendar, MapPin, Globe, Gauge, Languages } from 'lucide-react';
-import { UserAccount } from '../lib/accountManager';
+import React, { useEffect, useState } from 'react';
+import { User, Phone, Mail, LogOut, X, Calendar, MapPin, Globe, Gauge, Languages, Database, CloudCheck, AlertCircle } from 'lucide-react';
+import { UserAccount, getLastAccountSyncStatus } from '../lib/accountManager';
+import { getSupabaseUrl, isSupabaseConfigured } from '../lib/supabaseClient';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -17,6 +18,16 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onSwitchAccount,
   onLogout
 }) => {
+  const isConfigured = isSupabaseConfigured();
+  const supabaseUrl = getSupabaseUrl();
+  const [syncStatus, setSyncStatus] = useState(getLastAccountSyncStatus());
+
+  useEffect(() => {
+    if (isOpen) {
+      setSyncStatus(getLastAccountSyncStatus());
+    }
+  }, [isOpen]);
+
   if (!isOpen || !account) return null;
 
   return (
@@ -123,6 +134,37 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <span className="text-stone-500">Pairing Code:</span>
               <span className="font-mono font-bold text-[#A38258]">{account.supervisorCode || '—'}</span>
             </div>
+          </div>
+
+          {/* Central Cloud Database Sync Status */}
+          <div className="p-3 rounded-xl bg-stone-50 border border-stone-200 space-y-1.5 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-stone-700 flex items-center gap-1.5">
+                <Database className="w-3.5 h-3.5 text-[#A38258]" />
+                <span>Supabase Cloud Sync</span>
+              </span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                isConfigured ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+              }`}>
+                {isConfigured ? 'Connected' : 'Offline / Unconfigured'}
+              </span>
+            </div>
+            <div className="text-[11px] text-stone-500 leading-snug">
+              {isConfigured ? (
+                <span>
+                  Syncing to <strong className="text-stone-700 font-mono">{supabaseUrl.replace('https://', '').split('.')[0]}.supabase.co</strong> table <code className="text-stone-700 font-mono">driver_accounts</code>.
+                </span>
+              ) : (
+                <span>
+                  No URL/Key configured in <code className="text-stone-700 font-mono">src/config/supabaseConfig.ts</code>. Accounts save locally on device only.
+                </span>
+              )}
+            </div>
+            {syncStatus && syncStatus.message && (
+              <div className={`text-[10px] p-2 rounded-lg ${syncStatus.success ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-900 font-mono'}`}>
+                {syncStatus.message}
+              </div>
+            )}
           </div>
 
           {/* Actions */}

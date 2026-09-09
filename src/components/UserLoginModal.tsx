@@ -164,7 +164,7 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
     const cleanUser = usernameInput.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
 
     try {
-      const { account } = await createAccountAsync({
+      const { account, syncResult } = await createAccountAsync({
         username: cleanUser,
         fullName: fullName.trim() || cleanUser,
         city: city.trim(),
@@ -178,6 +178,10 @@ export const UserLoginModal: React.FC<UserLoginModalProps> = ({
         parentName: parentName.trim(),
         parentPhone: parentPhone.trim()
       });
+
+      if (syncResult && !syncResult.success) {
+        console.warn('⚠️ Supabase Cloud Sync Warning on Account Creation:', syncResult.message);
+      }
 
       setActiveUsername(cleanUser);
       onLoginSuccess(cleanUser, account);

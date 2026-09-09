@@ -360,6 +360,16 @@ export function saveAccount(account: UserAccount): void {
   }
 }
 
+let lastAccountSyncStatus: { success: boolean; message: string; timestamp: number } = {
+  success: false,
+  message: 'Supabase credentials not configured in src/config/supabaseConfig.ts',
+  timestamp: Date.now()
+};
+
+export function getLastAccountSyncStatus() {
+  return lastAccountSyncStatus;
+}
+
 export async function saveAccountAsync(account: UserAccount): Promise<{ success: boolean; message?: string }> {
   const cleanKey = account.username.toLowerCase();
 
@@ -375,9 +385,12 @@ export async function saveAccountAsync(account: UserAccount): Promise<{ success:
   // 2. Direct Supabase Client Operation
   const client = getSupabaseClient();
   if (!client) {
+    const msg = 'Supabase credentials missing. Enter your project URL & Anon Key in src/config/supabaseConfig.ts and run "npm run build && npx cap sync ios".';
+    console.warn('⚠️ [Supabase Sync Notice]:', msg);
+    lastAccountSyncStatus = { success: false, message: msg, timestamp: Date.now() };
     return {
-      success: true,
-      message: 'Saved locally on device. Configure Supabase URL & Key in Database Settings to sync to cloud.'
+      success: false,
+      message: msg
     };
   }
 
@@ -406,18 +419,21 @@ export async function saveAccountAsync(account: UserAccount): Promise<{ success:
 
     const { error: upsertErr } = await client.from('driver_accounts').upsert(payload, { onConflict: 'username' });
     if (!upsertErr) {
+      lastAccountSyncStatus = { success: true, message: 'Synced to Supabase table "driver_accounts"', timestamp: Date.now() };
       return { success: true, message: 'Saved and synced to Supabase Cloud!' };
     }
 
     // Fallback: Try update
     const { error: updateErr } = await client.from('driver_accounts').update(payload).eq('username', cleanKey);
     if (!updateErr) {
+      lastAccountSyncStatus = { success: true, message: 'Updated in Supabase table "driver_accounts"', timestamp: Date.now() };
       return { success: true, message: 'Saved and updated in Supabase Cloud!' };
     }
 
     // Fallback: Try insert
     const { error: insertErr } = await client.from('driver_accounts').insert(payload);
     if (!insertErr) {
+      lastAccountSyncStatus = { success: true, message: 'Created in Supabase table "driver_accounts"', timestamp: Date.now() };
       return { success: true, message: 'Saved and created in Supabase Cloud!' };
     }
 
@@ -429,14 +445,17 @@ export async function saveAccountAsync(account: UserAccount): Promise<{ success:
       userMsg = 'Supabase Row Level Security policy is blocking inserts. Please run the RLS policies in schema.sql.';
     }
 
-    console.warn('Supabase save error:', err);
+    console.error('❌ Supabase driver_accounts save error:', err);
+    lastAccountSyncStatus = { success: false, message: userMsg, timestamp: Date.now() };
     return {
       success: false,
       message: userMsg
     };
   } catch (err: any) {
-    console.warn('Supabase driver_accounts save exception:', err);
-    return { success: false, message: err.message || 'Supabase connection error' };
+    console.error('❌ Supabase driver_accounts save exception:', err);
+    const msg = err.message || 'Supabase connection error';
+    lastAccountSyncStatus = { success: false, message: msg, timestamp: Date.now() };
+    return { success: false, message: msg };
   }
 }
 
