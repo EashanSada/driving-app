@@ -290,20 +290,20 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
       </header>
 
       {/* Mobile Bottom Thumb Navigation */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-xl border-t border-stone-200/80 px-4 py-2 flex items-center justify-around shadow-lg">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-stone-200/80 px-4 py-2 flex items-center justify-around shadow-lg">
         <button
           onClick={() => setActiveTab('hud')}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
+          className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
             activeTab === 'hud' ? 'text-stone-900 scale-105' : 'text-stone-400 hover:text-stone-700'
           }`}
         >
           <Activity className={`w-4 h-4 ${activeTab === 'hud' ? 'text-[#A38258]' : ''}`} />
-          <span>Drive</span>
+          <span>Cockpit</span>
         </button>
 
         <button
           onClick={() => setActiveTab('analysis')}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
+          className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
             activeTab === 'analysis' ? 'text-stone-900 scale-105' : 'text-stone-400 hover:text-stone-700'
           }`}
         >
@@ -313,22 +313,20 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
 
         <button
           onClick={() => setActiveTab('trips')}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
+          className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
             activeTab === 'trips' ? 'text-stone-900 scale-105' : 'text-stone-400 hover:text-stone-700'
           }`}
         >
           <History className={`w-4 h-4 ${activeTab === 'trips' ? 'text-[#A38258]' : ''}`} />
-          <span>Log</span>
+          <span>Logbook</span>
         </button>
 
         <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl text-[10px] font-bold transition-all cursor-pointer ${
-            mobileMenuOpen ? 'text-stone-900' : 'text-stone-400 hover:text-stone-700'
-          }`}
+          onClick={onOpenLoginModal}
+          className="flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[10px] font-bold text-stone-400 hover:text-stone-700 transition-all cursor-pointer"
         >
-          <Menu className="w-4 h-4" />
-          <span>Menu</span>
+          <User className="w-4 h-4" />
+          <span>Profile</span>
         </button>
       </div>
     </>

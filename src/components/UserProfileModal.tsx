@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, Phone, Mail, LogOut, X, Calendar, MapPin, Globe, Gauge, Languages, Database, CloudCheck, AlertCircle } from 'lucide-react';
+import { User, Phone, Mail, LogOut, X, Calendar, MapPin, Globe, Gauge, Languages, Database, CloudCheck, AlertCircle, ShieldCheck } from 'lucide-react';
 import { UserAccount, getLastAccountSyncStatus } from '../lib/accountManager';
 import { getSupabaseUrl, isSupabaseConfigured } from '../lib/supabaseClient';
 
@@ -165,6 +165,20 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 {syncStatus.message}
               </div>
             )}
+          </div>
+
+          {/* Privacy & Compliance */}
+          <div className="flex items-center justify-between text-xs px-1 text-stone-500">
+            <a
+              href="/privacy.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#A38258] hover:text-[#8c6d44] hover:underline flex items-center gap-1.5 font-medium transition-colors cursor-pointer"
+            >
+              <ShieldCheck className="w-4 h-4 text-[#A38258]" />
+              <span>Privacy Policy &amp; Data Rights</span>
+            </a>
+            <span className="text-[10px] font-mono text-stone-400">v1.0.0</span>
           </div>
 
           {/* Actions */}

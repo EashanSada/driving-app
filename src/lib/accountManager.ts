@@ -556,7 +556,7 @@ export function recordTripForActiveUser(tripSummary: any, unitSystem: UnitSystem
   const durationSeconds = tripSummary?.duration_seconds || tripSummary?.durationSec || 60;
   
   const classification = tripSummary?.classification || {};
-  const tripSafetyScore = typeof classification.safety_score === 'number' ? classification.safety_score : 95;
+  const tripSafetyScore = typeof classification.safety_score === 'number' ? classification.safety_score : 100;
   
   const avgVelKmh = tripSummary?.trip_summary?.avg_velocity_kmh || (tripSummary?.telemetry?.length ? (tripSummary.telemetry.reduce((a: any, b: any) => a + (b.velocity || 0), 0) / tripSummary.telemetry.length) : 0);
   const maxSpeedKmh = tripSummary?.trip_summary?.max_velocity_kmh || (tripSummary?.telemetry?.length ? Math.max(...tripSummary.telemetry.map((t: any) => t.velocity || 0)) : avgVelKmh);

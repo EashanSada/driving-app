@@ -12,13 +12,13 @@ class TelematicsEngine {
     this.useDemoSimulation = false;
     this.subscribers = [];
 
-    // Current State Telematics Vector - Real Resting Baseline (0.0 km/h)
+    // Current State Telematics Vector - Dynamic acceleration baseline (0.0 km/h, 0.0 G)
     this.state = {
       speedKmh: 0.0,
       targetSpeedKmh: 0.0,
       gForceX: 0.0, // Lateral (Left/Right turn)
       gForceY: 0.0, // Longitudinal (Accel/Braking)
-      gForceZ: 1.0, // Vertical (Gravity)
+      gForceZ: 0.0, // Vertical (Road dynamics)
       gForceMag: 0.0,
       jerkMs3: 0.0,
       headingDeg: 0,
@@ -36,7 +36,7 @@ class TelematicsEngine {
     this.hasLiveGpsFix = false;
     this.filteredGx = 0.0;
     this.filteredGy = 0.0;
-    this.filteredGz = 1.0;
+    this.filteredGz = 0.0;
     this.prevGy = 0.0;
 
     this.initSensors();
@@ -72,7 +72,7 @@ class TelematicsEngine {
             const nativeData = JSON.parse(rawJson);
             this.state.gForceX = nativeData.gForceX || 0;
             this.state.gForceY = nativeData.gForceY || 0;
-            this.state.gForceZ = nativeData.gForceZ || 1.0;
+            this.state.gForceZ = nativeData.gForceZ || 0.0;
             if (typeof nativeData.speedKmh === 'number') {
               this.state.speedKmh = nativeData.speedKmh;
             }
@@ -83,26 +83,39 @@ class TelematicsEngine {
           }
         }
 
-        const accel = event.acceleration || event.accelerationIncludingGravity;
-        if (accel && accel.x !== null && accel.x !== undefined) {
-          // Normalize to G (1G = 9.81 m/s^2)
-          const rawGx = accel.x / 9.81;
-          const rawGy = accel.y / 9.81;
-          const rawGz = (accel.z !== null && accel.z !== undefined) ? accel.z / 9.81 : 1.0;
+        // Standard DeviceMotion: Prefer linear acceleration (which already removes gravity)
+        let accel = event.acceleration;
+        let isLinear = true;
 
-          // Low-pass Exponential Moving Average Filter (alpha = 0.2) to smooth high-frequency vehicle vibration
-          const alpha = 0.2;
+        if (!accel || (accel.x === null && accel.y === null && accel.z === null)) {
+          accel = event.accelerationIncludingGravity;
+          isLinear = false;
+        }
+
+        if (accel && accel.x !== null && accel.x !== undefined) {
+          let rawGx = (accel.x || 0) / 9.81;
+          let rawGy = (accel.y || 0) / 9.81;
+          let rawGz = (accel.z || 0) / 9.81;
+
+          // If fallback with gravity is used, subtract resting 1G on the Z axis
+          if (!isLinear) {
+            rawGz = rawGz - 1.0;
+          }
+
+          // Low-pass Exponential Moving Average Filter (alpha = 0.25) to smooth high-frequency vehicle vibration
+          const alpha = 0.25;
           this.filteredGx = this.filteredGx * (1 - alpha) + rawGx * alpha;
           this.filteredGy = this.filteredGy * (1 - alpha) + rawGy * alpha;
           this.filteredGz = this.filteredGz * (1 - alpha) + rawGz * alpha;
 
-          // Deadband for tiny stationary phone vibration (< 0.05 G)
-          const cleanGx = Math.abs(this.filteredGx) < 0.05 ? 0.0 : this.filteredGx;
-          const cleanGy = Math.abs(this.filteredGy) < 0.05 ? 0.0 : this.filteredGy;
+          // Deadband for tiny stationary phone vibration (< 0.04 G)
+          const cleanGx = Math.abs(this.filteredGx) < 0.04 ? 0.0 : this.filteredGx;
+          const cleanGy = Math.abs(this.filteredGy) < 0.04 ? 0.0 : this.filteredGy;
+          const cleanGz = Math.abs(this.filteredGz) < 0.04 ? 0.0 : this.filteredGz;
 
           this.state.gForceX = parseFloat(cleanGx.toFixed(2));
           this.state.gForceY = parseFloat(cleanGy.toFixed(2));
-          this.state.gForceZ = parseFloat(this.filteredGz.toFixed(2));
+          this.state.gForceZ = parseFloat(cleanGz.toFixed(2));
           
           this.updateSensorMetricsOnly();
         }
@@ -211,10 +224,10 @@ class TelematicsEngine {
     this.state.speedKmh = 0.0;
     this.state.gForceX = 0.0;
     this.state.gForceY = 0.0;
-    this.state.gForceZ = 1.0;
+    this.state.gForceZ = 0.0;
     this.filteredGx = 0.0;
     this.filteredGy = 0.0;
-    this.filteredGz = 1.0;
+    this.filteredGz = 0.0;
     this.prevGy = 0.0;
     this.brakingTicks = 0;
     this.corneringTicks = 0;
@@ -266,38 +279,36 @@ class TelematicsEngine {
   }
 
   updateSensorMetricsOnly() {
-    // Quick sensor magnitude update for canvas responsiveness
-    const netZ = this.state.gForceZ - 1.0;
-    this.state.gForceMag = Math.sqrt(
+    // Dynamic lateral + longitudinal G-force magnitude
+    this.state.gForceMag = parseFloat(Math.sqrt(
       Math.pow(this.state.gForceX, 2) +
-      Math.pow(this.state.gForceY, 2) +
-      Math.pow(netZ, 2)
-    );
+      Math.pow(this.state.gForceY, 2)
+    ).toFixed(2));
     this.notifySubscribers();
   }
 
   processTickTelemetry(dtSeconds) {
-    const netZ = this.state.gForceZ - 1.0;
-    this.state.gForceMag = Math.sqrt(
+    // Dynamic lateral + longitudinal G-force magnitude
+    this.state.gForceMag = parseFloat(Math.sqrt(
       Math.pow(this.state.gForceX, 2) +
-      Math.pow(this.state.gForceY, 2) +
-      Math.pow(netZ, 2)
-    );
+      Math.pow(this.state.gForceY, 2)
+    ).toFixed(2));
 
     // Calculate Jerk (m/s^3) based on longitudinal change
     const deltaGy = this.state.gForceY - this.prevGy;
     this.prevGy = this.state.gForceY;
     const rawJerk = dtSeconds > 0 ? (Math.abs(deltaGy) * 9.81) / dtSeconds : 0.0;
-    this.state.jerkMs3 = parseFloat(Math.min(15.0, rawJerk).toFixed(2));
+    this.state.jerkMs3 = parseFloat(Math.min(10.0, rawJerk).toFixed(2));
 
-    // Road bump suppression: high vertical shock (|netZ| > 0.55) indicates train tracks or potholes rather than hard braking
-    const isVerticalRoadBump = Math.abs(netZ) > 0.55;
+    // Road bump suppression: high vertical shock indicates potholes rather than braking
+    const isVerticalRoadBump = Math.abs(this.state.gForceZ) > 0.55;
 
-    // Genuine Harsh Braking: Deceleration exceeding -0.45 G sustained for 2 ticks (~500ms)
-    if (this.state.gForceY < -0.45 && !isVerticalRoadBump) {
+    // Harsh Braking / Rapid Longitudinal Deceleration / Backward Shake (> 0.42 G)
+    if (this.state.gForceY < -0.42) {
       this.brakingTicks = (this.brakingTicks || 0) + 1;
-      if (this.brakingTicks === 2) {
+      if (this.brakingTicks >= 2) {
         this.state.harshBrakingCount++;
+        this.brakingTicks = 0;
         if (window.AndroidBridge && window.AndroidBridge.triggerHapticWarning) {
           window.AndroidBridge.triggerHapticWarning('HARSH_BRAKING');
         }
@@ -306,11 +317,12 @@ class TelematicsEngine {
       this.brakingTicks = 0;
     }
 
-    // Genuine Harsh Cornering: Lateral G-Force |gForceX| > 0.45 G sustained for 2 ticks (~500ms)
-    if (Math.abs(this.state.gForceX) > 0.45 && !isVerticalRoadBump) {
+    // Harsh Cornering / Rapid Lateral Whipping / Side-to-Side Shake (> 0.42 G)
+    if (Math.abs(this.state.gForceX) > 0.42) {
       this.corneringTicks = (this.corneringTicks || 0) + 1;
-      if (this.corneringTicks === 2) {
+      if (this.corneringTicks >= 2) {
         this.state.harshCorneringCount++;
+        this.corneringTicks = 0;
       }
     } else {
       this.corneringTicks = 0;
@@ -327,7 +339,7 @@ class TelematicsEngine {
     };
 
     this.state.telemetryHistory.push(point);
-    if (this.state.telemetryHistory.length > 300) {
+    if (this.state.telemetryHistory.length > 500) {
       this.state.telemetryHistory.shift();
     }
 
